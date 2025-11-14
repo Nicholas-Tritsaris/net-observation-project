@@ -1,1 +1,0 @@
-SELECT service_name, COUNT(*) FROM censys_data GROUP BY service_name ORDER BY 2 DESC LIMIT 50;

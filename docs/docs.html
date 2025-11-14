@@ -1,81 +1,143 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>Docs · Net Observation Project</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Documentation · Net Observation Project</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2.1.3/dist/auth0-spa-js.production.js"></script>
+  <script defer src="script.js"></script>
 </head>
-<body class="dark">
-<header class="neon-banner small">
-  <img src="logo.png" class="logo" alt="Logo">
-  <div class="banner-text">
-    <h1>Documentation</h1>
-    <p class="subtitle">Methodology, datasets, and usage</p>
-  </div>
-</header>
-<div class="layout">
-  <aside class="sidebar collapsed">
-    <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
-    <nav class="main-nav">
-      <a href="index.html">Home</a>
-      <a href="docs.html" class="active">Docs</a>
-      <a href="api.html">API</a>
+<body data-page="docs">
+  <aside class="sidebar">
+    <div class="logo-placeholder" role="img" aria-label="Net Observation Project logo">NOP</div>
+    <div class="theme-toggle" data-role="theme-toggle" role="button" tabindex="0">
+      <span>Theme:</span>
+      <strong data-label>AUTO</strong>
+    </div>
+    <nav>
+      <a href="index.html">Overview</a>
       <a href="dashboard.html">Dashboard</a>
-      <a href="data.html">Data Visualizer</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="data.html">Data Lab</a>
       <a href="versions.html">Versions</a>
     </nav>
-    <hr>
-    <nav class="version-nav">
-      <div class="nav-header">Docs Versions</div>
-      <a href="#">v1.0 · Public</a>
-      <a href="#" class="disabled">v1.1 · WIP</a>
-      <a href="#" class="disabled">v2.0 · Future</a>
-    </nav>
-    <hr>
-    <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
-    <button class="settings-btn" onclick="toggleSettings()">Settings</button>
   </aside>
+  <button class="sidebar-toggle" aria-label="Toggle navigation" aria-expanded="true">&#x2715;</button>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div class="logo-inline" role="img" aria-label="Net Observation">NOP</div>
+      <div>
+        <h1 style="margin:0;font-size:1.2rem;letter-spacing:0.08em;">Documentation Hub</h1>
+        <p style="margin:0;color:var(--text-muted);font-size:0.85rem;">Integrate, automate, extend</p>
+      </div>
+    </div>
+    <nav class="primary-nav">
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="data.html">Data Lab</a>
+      <a href="versions.html">Versions</a>
+      <span class="badge" data-auth-status>Anonymous</span>
+      <button data-action="login" class="badge" style="cursor:pointer; background:rgba(0,255,255,0.12);">Login</button>
+      <button data-action="logout" class="badge hidden" style="cursor:pointer; background:rgba(255,0,255,0.12);">Logout</button>
+    </nav>
+  </header>
+
   <main>
-    <section>
-      <h2>Overview</h2>
-      <p>This mirrors your GitHub README and the contents of <code>/docs</code> in the repository.</p>
-    </section>
-    <section>
-      <h2>Methodology</h2>
-      <p>Paste high-level details from <code>docs/methodology.md</code> here.</p>
-    </section>
-    <section>
-      <h2>Datasets</h2>
-      <p>Summaries from <code>docs/datasets.md</code>, including which Censys datasets are used.</p>
-    </section>
+    <div class="docs-layout">
+      <aside class="docs-sidebar">
+        <h3>Getting Started</h3>
+        <ul>
+          <li><a href="#introduction">Introduction</a></li>
+          <li><a href="#setup">Setup</a></li>
+          <li><a href="#deployment">Cloudflare Deployment</a></li>
+        </ul>
+        <h3>Frontend</h3>
+        <ul>
+          <li><a href="#theme-system">Theme System</a></li>
+          <li><a href="#plugins">Plugin API</a></li>
+          <li><a href="#visualizations">Visualizations</a></li>
+        </ul>
+        <h3>Backend</h3>
+        <ul>
+          <li><a href="#censys-endpoint">/api/censys-summary</a></li>
+          <li><a href="#environment">Environment Variables</a></li>
+        </ul>
+      </aside>
+      <div class="docs-content">
+        <section id="introduction">
+          <h2>Introduction</h2>
+          <p>The Net Observation Project delivers a cyber-neon themed operational console that fuses D3.js cartography, Chart.js intelligence dashboards, Auth0-ready authentication, and a flexible plugin architecture.</p>
+        </section>
+        <section id="setup">
+          <h2>Setup</h2>
+          <ol>
+            <li>Install dependencies (if any) and ensure <code>npm</code> or <code>pnpm</code> is available for local tooling.</li>
+            <li>Place all static files in the <code>docs/</code> directory. Cloudflare Pages will serve this as the root.</li>
+            <li>Configure environment variables <code>CENSYS_API_ID</code> and <code>CENSYS_API_SECRET</code> within the Pages project.</li>
+          </ol>
+        </section>
+        <section id="deployment">
+          <h2>Cloudflare Deployment</h2>
+          <p>When deploying to Cloudflare Pages, select the <strong>docs</strong> directory as the build output. Cloudflare Pages Functions under <code>functions/</code> are automatically deployed and available beneath <code>/api/*</code>. The <code>/api/censys-summary</code> endpoint powers live charts and data refresh across the UI.</p>
+        </section>
+        <section id="theme-system">
+          <h2>Theme System</h2>
+          <p>The interface reacts to system-level color-scheme preferences while offering an explicit <strong>auto/dark/light</strong> toggle. Preferences are persisted in <code>localStorage</code> under <code>net-observation-settings</code> and propagate across every page.</p>
+        </section>
+        <section id="plugins">
+          <h2>Plugin API</h2>
+          <p>Plugins register via <code>window.registerPlugin</code> and may expose terminal commands by defining a <code>command</code> and <code>run</code> handler. They receive contextual helpers including the global app state and a terminal logger.</p>
+          <pre style="background:rgba(0,0,0,0.35);padding:1rem;border-radius:12px;overflow:auto;">registerPlugin({
+  name: 'intel-export',
+  command: 'export',
+  run(_, { state }) {
+    return JSON.stringify(state.stats, null, 2);
+  }
+});</pre>
+        </section>
+        <section id="visualizations">
+          <h2>Visualizations</h2>
+          <p>Chart.js renders service composition and country distribution charts with automatic refresh every minute. D3.js plots a Natural Earth projection heatmap, colouring countries based on Censys host density.</p>
+        </section>
+        <section id="censys-endpoint">
+          <h2>/api/censys-summary</h2>
+          <p>The backend Cloudflare Function authenticates with the Censys Search v2 API, consolidates host and service counts, and exposes the result as JSON. Frontend components poll this endpoint for real-time situational awareness.</p>
+        </section>
+        <section id="environment">
+          <h2>Environment Variables</h2>
+          <p>Define <code>CENSYS_API_ID</code> and <code>CENSYS_API_SECRET</code> within the Cloudflare Pages dashboard under <em>Settings → Environment Variables</em>. These values are not exposed client-side and are injected securely during function execution.</p>
+        </section>
+      </div>
+    </div>
   </main>
-</div>
 
-<div id="settingsPanel" class="settings-panel hidden">
-  <div class="settings-inner">
-    <h2>Settings / Config</h2>
-    <p>Shared across all pages via localStorage.</p>
-    <label>Backend summary endpoint:<br>
-      <input id="cfgEndpoint" placeholder="/api/censys-summary">
-    </label>
-    <label>Refresh interval (seconds):<br>
-      <input id="cfgInterval" type="number" min="5" max="3600" step="5">
-    </label>
-    <h3>Auth0</h3>
-    <label>Auth0 Domain:<br>
-      <input id="cfgAuthDomain" placeholder="YOUR-TENANT.eu.auth0.com">
-    </label>
-    <label>Auth0 Client ID:<br>
-      <input id="cfgAuthClient" placeholder="YOUR_CLIENT_ID">
-    </label>
-    <button id="cfgSaveBtn">Save Settings</button>
-    <button id="cfgCloseBtn" class="ghost-btn" onclick="toggleSettings()">Close</button>
-  </div>
-</div>
-
-<footer>
-  <p>Docs · Net Observation Project 📘</p>
-</footer>
+  <button class="settings-toggle">&#9881;</button>
+  <form class="settings-panel hidden">
+    <h4>System Settings</h4>
+    <label for="backendUrl">Backend Endpoint</label>
+    <input id="backendUrl" name="backendUrl" type="url" placeholder="https://example.com/api/censys-summary" />
+    <label for="auth0Domain">Auth0 Domain</label>
+    <input id="auth0Domain" name="auth0Domain" type="text" placeholder="tenant.eu.auth0.com" />
+    <label for="auth0ClientId">Auth0 Client ID</label>
+    <input id="auth0ClientId" name="auth0ClientId" type="text" placeholder="abc123XYZ" />
+    <label for="themeMode">Theme Mode</label>
+    <select id="themeMode" name="themeMode">
+      <option value="auto">Auto</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <button type="submit">Save Settings</button>
+  </form>
 </body>
 </html>

@@ -1,121 +1,170 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>Dashboard · Net Observation Project</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
-  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.2/auth0-spa-js.production.js"></script>
-  <script src="script.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Operational Dashboard · Net Observation Project</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2.1.3/dist/auth0-spa-js.production.js"></script>
+  <script defer src="script.js"></script>
 </head>
-<body class="dark">
-
-<header class="neon-banner small">
-  <img src="logo.png" class="logo" alt="Logo">
-  <div class="banner-text">
-    <h1>Dashboard</h1>
-    <p class="subtitle">Live exposure overview, charts, and world heatmap</p>
-  </div>
-</header>
-
-<div class="layout">
-  <aside class="sidebar collapsed">
-    <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
-    <nav class="main-nav">
-      <a href="index.html">Home</a>
+<body data-page="dashboard">
+  <aside class="sidebar">
+    <div class="logo-placeholder" role="img" aria-label="Net Observation Project logo">NOP</div>
+    <div class="theme-toggle" data-role="theme-toggle" role="button" tabindex="0">
+      <span>Theme:</span>
+      <strong data-label>AUTO</strong>
+    </div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
       <a href="docs.html">Docs</a>
       <a href="api.html">API</a>
-      <a href="dashboard.html" class="active">Dashboard</a>
-      <a href="data.html">Data Visualizer</a>
+      <a href="data.html">Data Lab</a>
       <a href="versions.html">Versions</a>
     </nav>
-    <hr>
-    <nav class="version-nav">
-      <div class="nav-header">Docs Versions</div>
-      <a href="#">v1.0 · Public</a>
-      <a href="#" class="disabled">v1.1 · WIP</a>
-      <a href="#" class="disabled">v2.0 · Future</a>
-    </nav>
-    <hr>
-    <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
-    <button class="settings-btn" onclick="toggleSettings()">Settings</button>
   </aside>
+  <button class="sidebar-toggle" aria-label="Toggle navigation" aria-expanded="true">&#x2715;</button>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div class="logo-inline" role="img" aria-label="Net Observation">NOP</div>
+      <div>
+        <h1 style="margin:0;font-size:1.2rem;letter-spacing:0.08em;">Operational Dashboard</h1>
+        <p style="margin:0;color:var(--text-muted);font-size:0.85rem;">Charts, heatmaps, and live Censys telemetry</p>
+      </div>
+    </div>
+    <nav class="primary-nav">
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="data.html">Data Lab</a>
+      <a href="versions.html">Versions</a>
+      <span class="badge" data-auth-status>Anonymous</span>
+      <button data-action="login" class="badge" style="cursor:pointer; background:rgba(0,255,255,0.12);">Login</button>
+      <button data-action="logout" class="badge hidden" style="cursor:pointer; background:rgba(255,0,255,0.12);">Logout</button>
+    </nav>
+  </header>
 
   <main>
-    <section id="live-dashboard">
-      <h2>Live Censys Exposure Overview</h2>
-      <p class="note">
-        This dashboard polls a backend endpoint (e.g. <code>/api/censys-summary</code>) every N seconds
-        to update the cards, charts, and heatmap. Configure it in <strong>Settings</strong>.
-      </p>
+    <section class="grid two">
+      <article class="card">
+        <h2>Censys Summary</h2>
+        <h3>Auto-refreshing telemetry</h3>
+        <div class="stats-grid">
+          <div class="stat">
+            <span>Total Hosts</span>
+            <strong data-stat="total-hosts">—</strong>
+          </div>
+          <div class="stat">
+            <span>Total Services</span>
+            <strong data-stat="total-services">—</strong>
+          </div>
+          <div class="stat">
+            <span>Last Sync</span>
+            <strong data-stat="last-sync">—</strong>
+          </div>
+        </div>
+      </article>
+      <article class="card">
+        <h2>Command Console</h2>
+        <h3>Automate &amp; orchestrate</h3>
+        <div class="terminal">
+          <div class="terminal-output"></div>
+          <div class="terminal-input">
+            <input type="text" placeholder="Type help for commands" />
+            <button type="button">Run</button>
+          </div>
+        </div>
+      </article>
+    </section>
 
-      <div class="card-grid">
-        <div class="card">
-          <h3>Total Hosts</h3>
-          <p id="live-total-hosts">loading…</p>
+    <section class="grid two">
+      <article class="card">
+        <h2>Service Composition</h2>
+        <h3>Live service ratio</h3>
+        <canvas id="servicesChart" height="280"></canvas>
+      </article>
+      <article class="card">
+        <h2>Country Distribution</h2>
+        <h3>Top exposure geos</h3>
+        <canvas id="countriesChart" height="280"></canvas>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Global Heatmap</h2>
+      <h3>D3.js natural earth projection</h3>
+      <svg id="worldHeatmap" width="100%" height="360"></svg>
+    </section>
+
+    <section class="grid two">
+      <article class="card">
+        <h2>Countries</h2>
+        <h3>Aggregated host counts</h3>
+        <div class="table-scroll">
+          <table data-table="countries">
+            <thead>
+              <tr><th>Country</th><th>Hosts</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
-        <div class="card">
-          <h3>Total Services</h3>
-          <p id="live-total-services">loading…</p>
+      </article>
+      <article class="card">
+        <h2>Services</h2>
+        <h3>Service port density</h3>
+        <div class="table-scroll">
+          <table data-table="services">
+            <thead>
+              <tr><th>Service</th><th>Count</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
         </div>
-        <div class="card">
-          <h3>Last Sync</h3>
-          <p id="live-last-sync">loading…</p>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>Data Lab</h2>
+      <h3>JSON &amp; CSV visualizer</h3>
+      <p>Paste JSON or CSV below or drop a file to visualize. The parser will automatically detect the structure and render the normalized output.</p>
+      <div class="grid two">
+        <div>
+          <textarea id="dataInput" rows="10" style="width:100%;border-radius:12px;border:1px solid rgba(0,255,255,0.2);background:rgba(0,0,0,0.35);color:var(--text);padding:1rem;" placeholder='[{"country":"US","hosts":120}]'></textarea>
+          <div style="margin-top:0.8rem;display:flex;gap:0.8rem;align-items:center;">
+            <input type="file" id="fileInput" accept=".json,.csv,.txt" />
+            <button id="renderData" type="button" class="badge" style="cursor:pointer;">Render</button>
+          </div>
         </div>
+        <div id="dataOutput" style="background:rgba(0,0,0,0.4);border-radius:12px;padding:1rem;min-height:280px;overflow:auto;"></div>
       </div>
-    </section>
-
-    <section>
-      <h2>Traffic / Service Trends</h2>
-      <canvas id="trafficChart" height="140"></canvas>
-    </section>
-
-    <section>
-      <h2>World Exposure Heatmap</h2>
-      <div id="mapContainer">
-        <svg id="worldMap" viewBox="0 0 960 480"></svg>
-      </div>
-      <p class="note">Countries shaded based on per-country exposure from your backend JSON (fallback demo if none).</p>
-    </section>
-
-    <section>
-      <h2>Plugins</h2>
-      <p>This area renders plugin cards registered via <code>window.NET_OBS_PLUGINS</code> in <code>script.js</code> or extra JS files.</p>
-      <div id="pluginGrid" class="card-grid"></div>
     </section>
   </main>
-</div>
 
-<div id="settingsPanel" class="settings-panel hidden">
-  <div class="settings-inner">
-    <h2>Settings / Config</h2>
-    <p>Same configuration is shared across pages using localStorage.</p>
-
-    <h3>Backend / API</h3>
-    <label>Backend summary endpoint:<br>
-      <input id="cfgEndpoint" placeholder="/api/censys-summary">
-    </label>
-    <label>Refresh interval (seconds):<br>
-      <input id="cfgInterval" type="number" min="5" max="3600" step="5">
-    </label>
-
-    <h3>Auth0 (optional)</h3>
-    <label>Auth0 Domain:<br>
-      <input id="cfgAuthDomain" placeholder="YOUR-TENANT.eu.auth0.com">
-    </label>
-    <label>Auth0 Client ID:<br>
-      <input id="cfgAuthClient" placeholder="YOUR_CLIENT_ID">
-    </label>
-    <button id="cfgSaveBtn">Save Settings</button>
-    <button id="cfgCloseBtn" class="ghost-btn" onclick="toggleSettings()">Close</button>
-  </div>
-</div>
-
-<footer>
-  <p>Dashboard · Net Observation Project 🌍📊</p>
-</footer>
-
+  <button class="settings-toggle">&#9881;</button>
+  <form class="settings-panel hidden">
+    <h4>System Settings</h4>
+    <label for="backendUrl">Backend Endpoint</label>
+    <input id="backendUrl" name="backendUrl" type="url" placeholder="https://example.com/api/censys-summary" />
+    <label for="auth0Domain">Auth0 Domain</label>
+    <input id="auth0Domain" name="auth0Domain" type="text" placeholder="tenant.eu.auth0.com" />
+    <label for="auth0ClientId">Auth0 Client ID</label>
+    <input id="auth0ClientId" name="auth0ClientId" type="text" placeholder="abc123XYZ" />
+    <label for="themeMode">Theme Mode</label>
+    <select id="themeMode" name="themeMode">
+      <option value="auto">Auto</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <button type="submit">Save Settings</button>
+  </form>
 </body>
 </html>

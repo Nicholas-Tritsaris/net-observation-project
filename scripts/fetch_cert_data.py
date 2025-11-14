@@ -1,1 +1,0 @@
-print('fetch cert placeholder')
