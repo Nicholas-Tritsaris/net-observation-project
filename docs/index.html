@@ -1,137 +1,132 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>Net Observation Project</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.2/auth0-spa-js.production.js"></script>
-  <script src="script.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Net Observation Project · Sentinel Intelligence</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2.1.3/dist/auth0-spa-js.production.js"></script>
+  <script defer src="script.js"></script>
 </head>
-<body class="dark">
-
-<div id="terminalIntro">
-  <pre>
-&gt; booting NET_OBSERVATION_CORE v1.0...
-&gt; loading Censys engines...
-&gt; attaching dashboards, plugins, maps...
-&gt; system online.
-  </pre>
-</div>
-
-<header class="neon-banner">
-  <img src="logo.png" class="logo" alt="Net Observation Project Logo">
-  <div class="banner-text">
-    <h1>Net Observation Project</h1>
-    <p class="subtitle">Global Internet Exposure &amp; Security Observation</p>
-  </div>
-  <div class="banner-right">
-    <button id="authLoginBtn" class="ghost-btn">Login</button>
-    <button id="authLogoutBtn" class="ghost-btn hidden">Logout</button>
-    <span id="authStatus" class="auth-status">Auth: anon</span>
-  </div>
-</header>
-
-<div class="layout">
-  <aside class="sidebar collapsed">
-    <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
-    <input type="text" id="searchBox" placeholder="Search sections...">
-    <nav class="main-nav">
-      <a href="index.html" class="active">Home</a>
+<body data-page="home">
+  <aside class="sidebar">
+    <div class="logo-sigil logo-sigil--sidebar" role="img" aria-label="Net Observation Project logo"></div>
+    <div class="theme-toggle" data-role="theme-toggle" role="button" tabindex="0">
+      <span>Theme:</span>
+      <strong data-label>AUTO</strong>
+    </div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
       <a href="docs.html">Docs</a>
       <a href="api.html">API</a>
-      <a href="dashboard.html">Dashboard</a>
-      <a href="data.html">Data Visualizer</a>
+      <a href="data.html">Data Lab</a>
       <a href="versions.html">Versions</a>
     </nav>
-    <hr>
-    <nav class="version-nav">
-      <div class="nav-header">Docs Versions</div>
-      <a href="#">v1.0 · Public</a>
-      <a href="#" class="disabled">v1.1 · WIP</a>
-      <a href="#" class="disabled">v2.0 · Future</a>
-    </nav>
-    <hr>
-    <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
-    <button class="settings-btn" onclick="toggleSettings()">Settings</button>
+    <div style="margin-top:2rem; font-size:0.85rem; color:var(--text-muted);">
+      <p>Monitor the pulse of the global internet perimeter. Neon infused telemetry, real-time Censys insights, and plugin-ready automation.</p>
+    </div>
   </aside>
+  <button class="sidebar-toggle" aria-label="Toggle navigation" aria-expanded="true">&#x2715;</button>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <div class="logo-sigil logo-sigil--header" role="img" aria-label="Net Observation Project logo"></div>
+      <div>
+        <h1 style="margin:0;font-size:1.2rem;letter-spacing:0.08em;">Net Observation Project</h1>
+        <p style="margin:0;color:var(--text-muted);font-size:0.85rem;">Cyber-neon intelligence &amp; observability platform</p>
+      </div>
+    </div>
+    <nav class="primary-nav">
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="data.html">Data Lab</a>
+      <a href="versions.html">Versions</a>
+      <span class="badge" data-auth-status>Anonymous</span>
+      <button data-action="login" class="badge" style="cursor:pointer; background:rgba(0,255,255,0.12);">Login</button>
+      <button data-action="logout" class="badge hidden" style="cursor:pointer; background:rgba(255,0,255,0.12);">Logout</button>
+    </nav>
+  </header>
 
   <main>
-    <section>
-      <h2>Welcome</h2>
-      <p>
-        This UI is the front-end for the <strong>Net Observation Project</strong>, a non-commercial
-        research effort analyzing global internet exposure using Censys datasets. It now includes:
-      </p>
-      <ul>
-        <li>Dynamic Censys-style live stats (via your backend proxy)</li>
-        <li>Auto-updating charts &amp; D3-based world heatmap</li>
-        <li>Settings panel, Auth0 hooks, plugin system, and data visualizer</li>
-      </ul>
-    </section>
-
-    <section>
-      <h2>Live Snapshot</h2>
-      <div class="card-grid">
-        <div class="card">
-          <h3>Live Censys Hosts</h3>
-          <p id="card-live-hosts">Total hosts: loading…</p>
+    <section class="card">
+      <h2>Mission</h2>
+      <h3>Real-time observability for attack surface scouts</h3>
+      <p>The Net Observation Project fuses live Censys telemetry, predictive analytics, and dynamic visualizations into a single cohesive monitoring experience. Every component embraces a cyberpunk aesthetic with purposeful ergonomics that keep analysts in the flow.</p>
+      <div class="stats-grid" style="margin-top:1.5rem;">
+        <div class="stat">
+          <span>Total Hosts</span>
+          <strong data-stat="total-hosts">—</strong>
         </div>
-        <div class="card">
-          <h3>Live Censys Services</h3>
-          <p id="card-live-services">Tracked services: loading…</p>
+        <div class="stat">
+          <span>Total Services</span>
+          <strong data-stat="total-services">—</strong>
         </div>
-        <div class="card">
-          <h3>Last Sync</h3>
-          <p id="card-live-sync">Sync: loading…</p>
+        <div class="stat">
+          <span>Last Sync</span>
+          <strong data-stat="last-sync">—</strong>
         </div>
       </div>
     </section>
 
-    <section id="terminal-runner-section">
-      <h2>Terminal Runner</h2>
-      <div class="card">
-        <p>Type commands like <code>help</code>, <code>stats</code>, <code>theme dark</code>, <code>theme light</code>, <code>plugins</code>.</p>
-        <div class="terminal-runner">
-          <div id="terminalOutput" class="terminal-output"></div>
-          <input id="terminalInput" class="terminal-input" placeholder="net-observation&gt; ">
+    <section class="grid two">
+      <article class="card">
+        <h2>Live Heatmap</h2>
+        <h3>Global exposure heat signature</h3>
+        <svg id="worldHeatmap" width="100%" height="320"></svg>
+      </article>
+      <article class="card">
+        <h2>Command Core</h2>
+        <h3>Terminal-style command runner</h3>
+        <div class="terminal">
+          <div class="terminal-output"></div>
+          <div class="terminal-input">
+            <input type="text" placeholder="Type help for commands" />
+            <button type="button">Run</button>
+          </div>
         </div>
-      </div>
+      </article>
     </section>
 
+    <section class="card">
+      <h2>Plugin Ecosystem</h2>
+      <h3>Extend with custom logic</h3>
+      <p>Extend the Net Observation Project by registering plugins via <code>window.registerPlugin</code>. Plugins may attach new terminal commands, respond to lifecycle hooks, or enrich telemetry with overlays. This lightweight system encourages experimentation and allows operations teams to tailor workflows.</p>
+      <pre style="background:rgba(0,0,0,0.35);padding:1rem;border-radius:12px;overflow:auto;">registerPlugin({
+  name: 'intel-broadcast',
+  command: 'broadcast',
+  run(message, { log }) {
+    log(`Broadcasting signal → ${message}`);
+    return 'Signal routed to relay mesh.';
+  }
+});</pre>
+    </section>
   </main>
-</div>
 
-<!-- Settings Panel -->
-<div id="settingsPanel" class="settings-panel hidden">
-  <div class="settings-inner">
-    <h2>Settings / Config</h2>
-    <p>These are stored locally in your browser (localStorage). No secrets are sent anywhere from this UI alone.</p>
-
-    <h3>Backend / API</h3>
-    <label>Backend summary endpoint (for Censys proxy):<br>
-      <input id="cfgEndpoint" placeholder="/api/censys-summary">
-    </label>
-    <label>Refresh interval (seconds):<br>
-      <input id="cfgInterval" type="number" min="5" max="3600" step="5">
-    </label>
-
-    <h3>Auth0 (optional)</h3>
-    <p>Only fill these in if you have an Auth0 SPA app configured. Do NOT commit real values publicly.</p>
-    <label>Auth0 Domain:<br>
-      <input id="cfgAuthDomain" placeholder="YOUR-TENANT.eu.auth0.com">
-    </label>
-    <label>Auth0 Client ID:<br>
-      <input id="cfgAuthClient" placeholder="YOUR_CLIENT_ID">
-    </label>
-    <button id="cfgSaveBtn">Save Settings</button>
-    <button id="cfgCloseBtn" class="ghost-btn" onclick="toggleSettings()">Close</button>
-  </div>
-</div>
-
-<footer>
-  <p>© 2025 Nicholas Tritsaris — Net Observation Project ⚡☣🌐</p>
-</footer>
-
+  <button class="settings-toggle">&#9881;</button>
+  <form class="settings-panel hidden">
+    <h4>System Settings</h4>
+    <label for="backendUrl">Backend Endpoint</label>
+    <input id="backendUrl" name="backendUrl" type="url" placeholder="https://example.com/api/censys-summary" />
+    <label for="auth0Domain">Auth0 Domain</label>
+    <input id="auth0Domain" name="auth0Domain" type="text" placeholder="tenant.eu.auth0.com" />
+    <label for="auth0ClientId">Auth0 Client ID</label>
+    <input id="auth0ClientId" name="auth0ClientId" type="text" placeholder="abc123XYZ" />
+    <label for="themeMode">Theme Mode</label>
+    <select id="themeMode" name="themeMode">
+      <option value="auto">Auto</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <button type="submit">Save Settings</button>
+  </form>
 </body>
 </html>
