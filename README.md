@@ -1,244 +1,105 @@
-# 🌐 Net Observation Project  
-### Global Internet Exposure & Security Observation Research  
-**Author:** Nicholas Tritsaris  
-**Status:** Active • Non-Commercial Research  
-**Datasets:** Censys Universal Internet Dataset • IPv4 Historical • X.509 Certificates  
+# Net Observation Project
 
----
+Cyber-neon observability suite pairing a responsive Cloudflare Pages frontend with a zero-cold-start Pages Function that aggregates live intelligence from the Censys Search v2 API.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Research-Active-brightgreen?style=for-the-badge">
-  <img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Data-Censys-orange?style=for-the-badge">
-  <img src="https://img.shields.io/badge/Python-3.10+-yellow?style=for-the-badge">
-</p>
-
-<p align="center">
-  <b>Non-commercial cybersecurity research analyzing global internet exposure using Censys datasets.</b>
-</p>
-
----
-
-# 📑 Table of Contents
-- [📌 Overview](#-overview)
-- [🎯 Objectives](#-objectives)
-- [📊 Features](#-features)
-- [🧠 Methodology](#-methodology)
-- [📁 Repository Structure](#-repository-structure)
-- [📡 Datasets Used](#-datasets-used)
-- [📥 Installation](#-installation)
-- [⚙️ Usage](#️-usage)
-- [📈 Example Outputs](#-example-outputs)
-- [🛣️ Roadmap](#️-roadmap)
-- [📚 Citation](#-citation)
-- [📄 License](#-license)
-- [🔗 Links](#-links)
-
----
-
-# 📌 Overview
-The **Net Observation Project** is an open, non-commercial cybersecurity research project investigating:
-
-- Global internet-facing services  
-- Exposure patterns  
-- Misconfigurations  
-- Certificate deployments  
-- Cryptographic hygiene  
-- Trends across IPv4 and IPv6 hosts  
-
-The research uses datasets from **Censys**, one of the largest Internet scanning platforms.
-
-👉 All findings and scripts are **fully open-source**, ensuring transparency and community value.
-
----
-
-# 🎯 Objectives
-- Measure the state of the public internet  
-- Identify insecure or outdated deployments  
-- Track global service trends  
-- Analyze certificate authority behavior  
-- Produce actionable insights to support netsec research  
-
----
-
-# 📊 Features
-✔ IPv4/IPv6 Exposure Analysis  
-✔ Service Enumeration  
-✔ Certificate Analysis  
-✔ Misconfiguration Detection  
-✔ Data Fetching Scripts  
-✔ JSON, CSV & visual output  
-✔ Full documentation  
-✔ Fully open-source  
-
----
-
-# 🧠 Methodology
-The project uses:
-
-- Censys **Search API**  
-- Censys **BigQuery Dataset** (optional)  
-- Python-based analysis  
-- Statistical aggregation  
-- Visual plots for summaries  
-- Public publication of findings  
-
-Full details available in `/docs/methodology.md`.
-
----
-
-# 📁 Repository Structure
+## Directory Layout
 
 ```
 net-observation-project/
-│
-├── README.md
-├── LICENSE
-│
-├── scripts/
-│   ├── fetch_ipv4_data.py
-│   ├── fetch_cert_data.py
-│   ├── analyze_services.py
-│   ├── analyze_certificates.py
-│   └── utils.py
-│
-├── docs/
-│   ├── methodology.md
-│   ├── datasets.md
-│   ├── results.md
-│   └── citations.md
-│
-└── visuals/
-    └── (graphs will be added here)
+  docs/                 # Frontend assets served by Cloudflare Pages
+  functions/api/        # Cloudflare Pages Functions (backend)
+  README.md             # Project documentation
+  .gitignore            # Common project ignores
 ```
 
----
+## Features
 
-# 📡 Datasets Used
-### **From Censys:**
-- **Universal Internet Dataset**  
-- **IPv4 Historical Scan Dataset**  
-- **Certificate (X.509) Dataset**  
+- Animated cyber-neon theme with automatic dark/light behaviour and manual override.
+- Collapsible sidebar navigation mirrored on every page for rapid context switching.
+- Live `/api/censys-summary` polling drives Chart.js charts, D3 world heatmap, and terminal outputs.
+- Terminal-style command runner with plugin registration API and sample plugin.
+- JSON/CSV data visualiser supporting clipboard paste or file uploads.
+- Settings control for backend endpoint and Auth0 SPA configuration with local persistence.
+- Optional Auth0 login wiring (via `@auth0/auth0-spa-js`) when credentials are supplied.
+- Versions hub highlighting roadmap milestones and multi-version documentation sidebar.
 
-All data is slightly delayed unless real-time access is approved.
+## Branding
 
----
+A stylised textual logo placeholder is rendered throughout the UI. To add your own branding, drop a `logo.png` (preferably 512×512) into `docs/` and the layout will adopt it automatically.
 
-# 📥 Installation
+## Running Locally
 
-### **Clone the repository**
-```bash
-git clone https://github.com/YOUR_USERNAME/net-observation-project.git
-cd net-observation-project
-```
+1. **Clone the repository** and install any tooling you prefer for static hosting (e.g. `npm install --global wrangler` for Cloudflare previews).
+2. **Serve the frontend** by pointing a static server at the `docs/` directory:
+   ```bash
+   npx http-server docs
+   ```
+   or use the Cloudflare Pages preview command:
+   ```bash
+   npx wrangler pages dev docs --local --persist
+   ```
+3. **Configure environment variables** for the backend function:
+   ```bash
+   export CENSYS_API_ID="your-censys-id"
+   export CENSYS_API_SECRET="your-censys-secret"
+   ```
+4. **Run the function locally** with Wrangler (optional but recommended):
+   ```bash
+   npx wrangler pages dev docs --local --persist \
+     --binding CENSYS_API_ID=$CENSYS_API_ID \
+     --binding CENSYS_API_SECRET=$CENSYS_API_SECRET
+   ```
+   The function is available at <http://localhost:8788/api/censys-summary> during development.
 
-### **Install dependencies**
-```bash
-pip install -r requirements.txt
-```
+## Deploying to Cloudflare Pages
 
-*(If you want, I can generate a `requirements.txt` too.)*
+1. **Create a Pages project** and connect it to this repository.
+2. **Set the build output directory** to `docs` (no build command required unless you add one).
+3. **Add environment variables** under *Pages → Settings → Environment Variables*:
+   - `CENSYS_API_ID`
+   - `CENSYS_API_SECRET`
+4. **Deploy**. Cloudflare automatically bundles `functions/api/censys-summary.js` as a Pages Function and exposes it at `/api/censys-summary` in production and preview environments.
 
----
+## Backend Function
 
-# ⚙️ Usage
+`functions/api/censys-summary.js` performs three parallel Censys API calls:
 
-### Fetch IPv4 exposure data
-```bash
-python scripts/fetch_ipv4_data.py
-```
+- `/hosts/search` to collect the global host count.
+- `/hosts/stats/services.service_name` to aggregate service coverage.
+- `/hosts/stats/location.country_code` to map per-country exposure.
 
-### Fetch certificate records
-```bash
-python scripts/fetch_cert_data.py
-```
+Responses are merged into a single JSON payload:
 
-### Analyze exposed services
-```bash
-python scripts/analyze_services.py
-```
-
-### Analyze certificate issuers
-```bash
-python scripts/analyze_certificates.py
-```
-
----
-
-# 📈 Example Outputs
-
-### 🟦 Top Exposed Services
-```
-HTTP: 82,341,991
-SSH: 24,553,119
-RDP: 3,992,002
-...
-```
-
-### 🔐 Most Common Certificate Issuers
-```
-Let's Encrypt Authority X3: 2,441,881
-Cloudflare ECC CA-3: 1,933,201
-...
-```
-
-### 🗺️ Geographic Patterns  
-*(visual graphs will be added in `/visuals`)*
-
----
-
-# 🛣️ Roadmap
-
-### 🔜 Coming Soon:
-- [ ] BigQuery SQL queries  
-- [ ] Global exposure heatmaps  
-- [ ] Certificate chain trust modeling  
-- [ ] Vulnerability pattern analysis (TLS, SSH, RDP)  
-- [ ] Blog article publication  
-- [ ] Graphs + dashboards  
-- [ ] Automated daily data sync scripts  
-
----
-
-# 📚 Citation
-If citing this project:
-
-```
-@misc{tritsaris2025netobs,
-  title = {Net Observation Project},
-  author = {Nicholas Tritsaris},
-  year = {2025},
-  howpublished = {\url{https://github.com/YOUR_USERNAME/net-observation-project}}
+```json
+{
+  "total_hosts": 123,
+  "total_services": 456,
+  "last_sync": "2025-01-01T12:00:00.000Z",
+  "countries": { "US": 120, "DE": 30 },
+  "services": { "http": 80, "https": 95 }
 }
 ```
 
-To cite Censys:
+Error conditions return a structured 502 response with diagnostic details while preserving the response schema.
 
+## Auth0 Integration
+
+Add your Auth0 domain and SPA client ID in the settings panel (gear icon bottom right). When supplied, the frontend initialises the Auth0 SPA SDK, exposing Login/Logout buttons in the top navigation and reflecting session state in real time.
+
+## Plugin System
+
+Developers can extend the UI by registering plugins at runtime:
+
+```html
+<script>
+registerPlugin({
+  name: 'intel-export',
+  command: 'export',
+  run(_, { state }) {
+    return JSON.stringify(state.stats, null, 2);
+  }
+});
+</script>
 ```
-@misc{censys,
-  title = {Censys Internet Data},
-  year = {2025},
-  howpublished = {https://censys.io/}
-}
-```
 
----
-
-# 📄 License
-This project is licensed under the **MIT License**.  
-You are free to use, modify, and distribute this research as long as the license terms are followed.
-
----
-
-# 🔗 Links
-- 🔍 Censys: https://censys.io  
-- 📘 Documentation: /docs  
-- 📝 Research Blog: *add your Blogger link here*  
-- 🐍 Scripts: /scripts  
-
----
-
-<p align="center">
-  <b>Made by Nicholas Tritsaris — Advancing open cybersecurity research.</b>
-</p>
-
+Plugins can provide new terminal commands, react to telemetry updates via the shared app state, and stream output to the command console using the `log` helper passed to each `run` invocation.
