@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Docs · Net Observation Project</title>
+  <title>Data Visualizer · Net Observation Project</title>
   <link rel="stylesheet" href="style.css">
   <script src="script.js" defer></script>
 </head>
@@ -10,8 +10,8 @@
 <header class="neon-banner small">
   <img src="logo.png" class="logo" alt="Logo">
   <div class="banner-text">
-    <h1>Documentation</h1>
-    <p class="subtitle">Methodology, datasets, and usage</p>
+    <h1>Data Visualizer</h1>
+    <p class="subtitle">Inspect JSON / CSV outputs from your scans</p>
   </div>
 </header>
 <div class="layout">
@@ -19,10 +19,10 @@
     <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
     <nav class="main-nav">
       <a href="index.html">Home</a>
-      <a href="docs.html" class="active">Docs</a>
+      <a href="docs.html">Docs</a>
       <a href="api.html">API</a>
       <a href="dashboard.html">Dashboard</a>
-      <a href="data.html">Data Visualizer</a>
+      <a href="data.html" class="active">Data Visualizer</a>
       <a href="versions.html">Versions</a>
     </nav>
     <hr>
@@ -38,16 +38,18 @@
   </aside>
   <main>
     <section>
-      <h2>Overview</h2>
-      <p>This mirrors your GitHub README and the contents of <code>/docs</code> in the repository.</p>
+      <h2>Paste Data</h2>
+      <p>Paste JSON array or CSV text below and click <strong>Render</strong>.</p>
+      <textarea id="dataInput" class="data-input" placeholder='[{"ip":"1.1.1.1","service":"https"}] or ip,service\n1.1.1.1,https'></textarea>
+      <div class="btn-row">
+        <button onclick="renderData()">Render</button>
+        <button class="ghost-btn" onclick="clearData()">Clear</button>
+      </div>
     </section>
     <section>
-      <h2>Methodology</h2>
-      <p>Paste high-level details from <code>docs/methodology.md</code> here.</p>
-    </section>
-    <section>
-      <h2>Datasets</h2>
-      <p>Summaries from <code>docs/datasets.md</code>, including which Censys datasets are used.</p>
+      <h2>Preview</h2>
+      <div id="dataSummary" class="data-summary"></div>
+      <div id="dataOutput" class="data-output-table"></div>
     </section>
   </main>
 </div>
@@ -75,7 +77,7 @@
 </div>
 
 <footer>
-  <p>Docs · Net Observation Project 📘</p>
+  <p>Data Visualizer · Net Observation Project 🧪</p>
 </footer>
 </body>
 </html>

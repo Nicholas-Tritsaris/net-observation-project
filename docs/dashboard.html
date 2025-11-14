@@ -1,1 +1,121 @@
-<h1>Live Dashboard</h1><p>Real-time stats placeholder.</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Dashboard · Net Observation Project</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script src="https://cdn.auth0.com/js/auth0-spa-js/2.2/auth0-spa-js.production.js"></script>
+  <script src="script.js" defer></script>
+</head>
+<body class="dark">
+
+<header class="neon-banner small">
+  <img src="logo.png" class="logo" alt="Logo">
+  <div class="banner-text">
+    <h1>Dashboard</h1>
+    <p class="subtitle">Live exposure overview, charts, and world heatmap</p>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar collapsed">
+    <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="dashboard.html" class="active">Dashboard</a>
+      <a href="data.html">Data Visualizer</a>
+      <a href="versions.html">Versions</a>
+    </nav>
+    <hr>
+    <nav class="version-nav">
+      <div class="nav-header">Docs Versions</div>
+      <a href="#">v1.0 · Public</a>
+      <a href="#" class="disabled">v1.1 · WIP</a>
+      <a href="#" class="disabled">v2.0 · Future</a>
+    </nav>
+    <hr>
+    <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
+    <button class="settings-btn" onclick="toggleSettings()">Settings</button>
+  </aside>
+
+  <main>
+    <section id="live-dashboard">
+      <h2>Live Censys Exposure Overview</h2>
+      <p class="note">
+        This dashboard polls a backend endpoint (e.g. <code>/api/censys-summary</code>) every N seconds
+        to update the cards, charts, and heatmap. Configure it in <strong>Settings</strong>.
+      </p>
+
+      <div class="card-grid">
+        <div class="card">
+          <h3>Total Hosts</h3>
+          <p id="live-total-hosts">loading…</p>
+        </div>
+        <div class="card">
+          <h3>Total Services</h3>
+          <p id="live-total-services">loading…</p>
+        </div>
+        <div class="card">
+          <h3>Last Sync</h3>
+          <p id="live-last-sync">loading…</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Traffic / Service Trends</h2>
+      <canvas id="trafficChart" height="140"></canvas>
+    </section>
+
+    <section>
+      <h2>World Exposure Heatmap</h2>
+      <div id="mapContainer">
+        <svg id="worldMap" viewBox="0 0 960 480"></svg>
+      </div>
+      <p class="note">Countries shaded based on per-country exposure from your backend JSON (fallback demo if none).</p>
+    </section>
+
+    <section>
+      <h2>Plugins</h2>
+      <p>This area renders plugin cards registered via <code>window.NET_OBS_PLUGINS</code> in <code>script.js</code> or extra JS files.</p>
+      <div id="pluginGrid" class="card-grid"></div>
+    </section>
+  </main>
+</div>
+
+<div id="settingsPanel" class="settings-panel hidden">
+  <div class="settings-inner">
+    <h2>Settings / Config</h2>
+    <p>Same configuration is shared across pages using localStorage.</p>
+
+    <h3>Backend / API</h3>
+    <label>Backend summary endpoint:<br>
+      <input id="cfgEndpoint" placeholder="/api/censys-summary">
+    </label>
+    <label>Refresh interval (seconds):<br>
+      <input id="cfgInterval" type="number" min="5" max="3600" step="5">
+    </label>
+
+    <h3>Auth0 (optional)</h3>
+    <label>Auth0 Domain:<br>
+      <input id="cfgAuthDomain" placeholder="YOUR-TENANT.eu.auth0.com">
+    </label>
+    <label>Auth0 Client ID:<br>
+      <input id="cfgAuthClient" placeholder="YOUR_CLIENT_ID">
+    </label>
+    <button id="cfgSaveBtn">Save Settings</button>
+    <button id="cfgCloseBtn" class="ghost-btn" onclick="toggleSettings()">Close</button>
+  </div>
+</div>
+
+<footer>
+  <p>Dashboard · Net Observation Project 🌍📊</p>
+</footer>
+
+</body>
+</html>

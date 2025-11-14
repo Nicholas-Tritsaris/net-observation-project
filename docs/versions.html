@@ -1,1 +1,82 @@
-<h1>Documentation Versions</h1><p>v1.0, v0.9, etc.</p>
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Versions · Net Observation Project</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body class="dark">
+<header class="neon-banner small">
+  <img src="logo.png" class="logo" alt="Logo">
+  <div class="banner-text">
+    <h1>Documentation Versions</h1>
+    <p class="subtitle">Track evolution of the research portal</p>
+  </div>
+</header>
+<div class="layout">
+  <aside class="sidebar collapsed">
+    <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
+    <nav class="main-nav">
+      <a href="index.html">Home</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="data.html">Data Visualizer</a>
+      <a href="versions.html" class="active">Versions</a>
+    </nav>
+    <hr>
+    <nav class="version-nav">
+      <div class="nav-header">Docs Versions</div>
+      <a href="#">v1.0 · Public</a>
+      <a href="#" class="disabled">v1.1 · WIP</a>
+      <a href="#" class="disabled">v2.0 · Future</a>
+    </nav>
+    <hr>
+    <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
+    <button class="settings-btn" onclick="toggleSettings()">Settings</button>
+  </aside>
+  <main>
+    <section>
+      <h2>Current</h2>
+      <ul>
+        <li><strong>v1.0</strong> – Initial public docs, dashboard, data visualizer, and plugin system.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Planned</h2>
+      <ul>
+        <li>v1.1 – Wired to real Censys summary backend, more charts.</li>
+        <li>v2.0 – Per-ASN, per-country deep dives, saved views, and downloads.</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<div id="settingsPanel" class="settings-panel hidden">
+  <div class="settings-inner">
+    <h2>Settings / Config</h2>
+    <p>Shared across all pages via localStorage.</p>
+    <label>Backend summary endpoint:<br>
+      <input id="cfgEndpoint" placeholder="/api/censys-summary">
+    </label>
+    <label>Refresh interval (seconds):<br>
+      <input id="cfgInterval" type="number" min="5" max="3600" step="5">
+    </label>
+    <h3>Auth0</h3>
+    <label>Auth0 Domain:<br>
+      <input id="cfgAuthDomain" placeholder="YOUR-TENANT.eu.auth0.com">
+    </label>
+    <label>Auth0 Client ID:<br>
+      <input id="cfgAuthClient" placeholder="YOUR_CLIENT_ID">
+    </label>
+    <button id="cfgSaveBtn">Save Settings</button>
+    <button id="cfgCloseBtn" class="ghost-btn" onclick="toggleSettings()">Close</button>
+  </div>
+</div>
+
+<footer>
+  <p>Versions · Net Observation Project 🧬</p>
+</footer>
+</body>
+</html>
