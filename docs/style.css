@@ -1,0 +1,23 @@
+
+body {
+  background: #0a0f1a;
+  color: #d4e2ff;
+  font-family: 'Roboto Mono', monospace;
+  margin: 0;
+  padding: 0;
+}
+header {
+  background: #0c1427;
+  padding: 40px;
+  text-align: center;
+  color: #66aaff;
+}
+.content {
+  padding: 30px;
+}
+a { color: #6bb7ff; }
+footer {
+  background: #0c1427;
+  padding: 20px;
+  text-align: center;
+}
