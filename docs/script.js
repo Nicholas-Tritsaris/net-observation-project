@@ -1,441 +1,665 @@
-
-// basic theme persistence
-(function initTheme(){
-  const saved = localStorage.getItem('netobs_theme');
-  if(saved){
-    document.body.classList.remove('dark','light');
-    document.body.classList.add(saved);
-  } else {
-    document.body.classList.add('dark');
-  }
-})();
-
-function toggleTheme(){
-  if(document.body.classList.contains('dark')){
-    document.body.classList.remove('dark');
-    document.body.classList.add('light');
-    localStorage.setItem('netobs_theme','light');
-  } else {
-    document.body.classList.remove('light');
-    document.body.classList.add('dark');
-    localStorage.setItem('netobs_theme','dark');
-  }
-}
-
-function toggleSidebar(){
-  const sb = document.querySelector('.sidebar');
-  if(sb) sb.classList.toggle('collapsed');
-}
-
-function toggleSettings(){
-  const panel = document.getElementById('settingsPanel');
-  if(panel) panel.classList.toggle('hidden');
-}
-
-// config storage
-function loadConfig(){
-  try{
-    const raw = localStorage.getItem('netobs_config');
-    if(!raw) return {};
-    return JSON.parse(raw);
-  }catch(e){ return {}; }
-}
-function saveConfig(cfg){
-  localStorage.setItem('netobs_config', JSON.stringify(cfg || {}));
-}
-
-// apply config to settings UI
-function bindSettingsUI(){
-  const cfg = loadConfig();
-  const ep = document.getElementById('cfgEndpoint');
-  const iv = document.getElementById('cfgInterval');
-  const ad = document.getElementById('cfgAuthDomain');
-  const ac = document.getElementById('cfgAuthClient');
-  if(ep) ep.value = cfg.endpoint || '/api/censys-summary';
-  if(iv) iv.value = cfg.interval || 60;
-  if(ad) ad.value = cfg.auth0Domain || '';
-  if(ac) ac.value = cfg.auth0Client || '';
-
-  const saveBtn = document.getElementById('cfgSaveBtn');
-  if(saveBtn){
-    saveBtn.onclick = () => {
-      const newCfg = {
-        endpoint: ep ? ep.value || '/api/censys-summary' : '/api/censys-summary',
-        interval: iv ? parseInt(iv.value || '60', 10) : 60,
-        auth0Domain: ad ? ad.value : '',
-        auth0Client: ac ? ac.value : ''
-      };
-      saveConfig(newCfg);
-      alert('Settings saved locally.');
-    };
-  }
-}
-
-// search filter
-const searchBox = document.getElementById('searchBox');
-if(searchBox){
-  searchBox.addEventListener('input', function(){
-    const text = this.value.toLowerCase();
-    document.querySelectorAll('main section').forEach(sec=>{
-      if(!text){ sec.style.display='block'; return; }
-      sec.style.display = sec.innerText.toLowerCase().includes(text)?'block':'none';
-    });
-  });
-}
-
-// safety: ensure intro disappears eventually
-setTimeout(()=>{
-  const intro = document.getElementById('terminalIntro');
-  if(intro) intro.style.display='none';
-}, 8000);
-
-// live stats loop
-let liveIntervalId = null;
-
-async function loadLiveStatsOnce(){
-  const cfg = loadConfig();
-  const endpoint = cfg.endpoint || '/api/censys-summary';
-
-  let data;
-  try {
-    const res = await fetch(endpoint, {cache:'no-store'});
-    if(res.ok){
-      data = await res.json();
-    }
-  } catch(e){
-    // ignore, fallback
-  }
-  if(!data){
-    // demo data
-    data = {
-      total_hosts: 123456789,
-      total_services: 987654321,
-      last_sync: new Date().toISOString(),
-      countries: { US: 120, DE: 80, NL: 42, AU: 35, GB: 60, FR: 55 },
-      services: { http: 80, https: 95, ssh: 40, rdp: 12, smtp: 22, dns: 60 }
-    };
-  }
-
-  updateLiveUI(data);
-  initTrafficChart(data);
-  initWorldMap(data.countries || {});
-  renderPlugins();
-}
-
-function startLiveLoop(){
-  const cfg = loadConfig();
-  const seconds = cfg.interval || 60;
-  if(liveIntervalId) clearInterval(liveIntervalId);
-  loadLiveStatsOnce();
-  liveIntervalId = setInterval(loadLiveStatsOnce, seconds * 1000);
-}
-
-function updateLiveUI(data){
-  const homeHosts = document.getElementById('card-live-hosts');
-  const homeServices = document.getElementById('card-live-services');
-  const homeSync = document.getElementById('card-live-sync');
-  const dashHosts = document.getElementById('live-total-hosts');
-  const dashServices = document.getElementById('live-total-services');
-  const dashSync = document.getElementById('live-last-sync');
-
-  if(homeHosts) homeHosts.textContent = 'Total hosts: ' + data.total_hosts.toLocaleString();
-  if(homeServices) homeServices.textContent = 'Tracked services: ' + data.total_services.toLocaleString();
-  if(homeSync) homeSync.textContent = 'Sync: ' + new Date(data.last_sync).toLocaleString();
-
-  if(dashHosts) dashHosts.textContent = data.total_hosts.toLocaleString();
-  if(dashServices) dashServices.textContent = data.total_services.toLocaleString();
-  if(dashSync) dashSync.textContent = new Date(data.last_sync).toLocaleString();
-}
-
-// Chart.js traffic chart
-function initTrafficChart(data){
-  const canvas = document.getElementById('trafficChart');
-  if(!canvas || typeof Chart === 'undefined') return;
-
-  const svc = data.services || {};
-  const labels = Object.keys(svc).length ? Object.keys(svc) : ['http','https','ssh','rdp','smtp','dns'];
-  const counts = Object.keys(svc).length ? Object.values(svc) : [80,95,40,12,22,60];
-
-  if(window._trafficChartInstance){
-    window._trafficChartInstance.data.labels = labels;
-    window._trafficChartInstance.data.datasets[0].data = counts;
-    window._trafficChartInstance.update();
-    return;
-  }
-
-  window._trafficChartInstance = new Chart(canvas.getContext('2d'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        label: 'Relative Exposure',
-        data: counts,
-      }]
+(() => {
+  window.__latestCensys = window.__latestCensys || null;
+  const AppState = {
+    settings: {
+      backendUrl: '/api/censys-summary',
+      auth0Domain: '',
+      auth0ClientId: '',
+      theme: 'auto'
     },
-    options: {
-      responsive:true,
-      plugins: {
-        legend:{ display:false }
-      },
-      scales: {
-        x:{ ticks:{ color:'#7fc6ff' }},
-        y:{ ticks:{ color:'#7fc6ff' }}
+    stats: null,
+    charts: {},
+    auth0Client: null,
+    worldData: null
+  };
+
+  const STORAGE_KEY = 'net-observation-settings';
+  const prefersDark = typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : { matches: true };
+
+  function loadSettings() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        Object.assign(AppState.settings, parsed);
       }
+    } catch (err) {
+      console.warn('Failed to load settings', err);
     }
-  });
-}
+  }
 
-// D3 world heatmap
-function initWorldMap(countryData){
-  const svg = document.getElementById('worldMap');
-  if(!svg || typeof d3 === 'undefined' || typeof topojson === 'undefined') return;
+  function saveSettings() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.settings));
+  }
 
-  const width = 960, height = 480;
-  const projection = d3.geoMercator().scale(150).translate([width/2, height/1.5]);
-  const path = d3.geoPath().projection(projection);
+  function applyTheme() {
+    let theme = AppState.settings.theme;
+    if (theme === 'auto') {
+      theme = prefersDark.matches ? 'dark' : 'light';
+    }
+    document.documentElement.setAttribute('data-theme', theme);
+    document.body.dataset.theme = theme;
+  }
 
-  const sel = d3.select(svg);
-  sel.selectAll('*').remove();
+  function initLogoPlaceholders() {
+    const createFallback = (img) => {
+      if (img.dataset.fallback === 'true') return;
+      img.dataset.fallback = 'true';
+      img.style.display = 'none';
+      const placeholder = document.createElement('div');
+      placeholder.className = 'logo-placeholder';
+      placeholder.setAttribute('aria-hidden', 'true');
+      placeholder.textContent = (img.alt || 'Net Observation').toUpperCase();
+      img.insertAdjacentElement('afterend', placeholder);
+    };
 
-  d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
-    .then(worldData => {
-      const countries = topojson.feature(worldData, worldData.objects.countries).features;
-
-      const values = Object.values(countryData || {});
-      const max = values.length ? Math.max(...values) : 1;
-      const color = d3.scaleSequential(d3.interpolateCool).domain([0, max || 1]);
-
-      sel.selectAll('path')
-        .data(countries)
-        .enter()
-        .append('path')
-        .attr('d', path)
-        .attr('fill', d => {
-          // Without ISO mapping we approximate with random mapping based on provided values:
-          if(!values.length) return color(0);
-          const v = values[Math.floor(Math.random()*values.length)];
-          return color(v);
-        })
-        .attr('stroke', '#050915')
-        .attr('stroke-width', 0.4)
-        .append('title')
-        .text('Demo exposure value');
-    })
-    .catch(err => {
-      console.error('Failed to load world map', err);
+    document.querySelectorAll('img[data-logo]').forEach((img) => {
+      const verify = () => {
+        if (!img.naturalWidth || !img.naturalHeight) {
+          createFallback(img);
+        }
+      };
+      img.addEventListener('error', () => createFallback(img));
+      if (img.complete) {
+        verify();
+      } else {
+        img.addEventListener('load', verify, { once: true });
+      }
     });
-}
+  }
 
-// Terminal command runner
-function initTerminal(){
-  const input = document.getElementById('terminalInput');
-  const output = document.getElementById('terminalOutput');
-  if(!input || !output) return;
+  function initThemeToggle() {
+    const toggle = document.querySelector('[data-role="theme-toggle"]');
+    if (!toggle) return;
 
-  function log(line){
-    output.textContent += line + "\n";
+    const updateLabel = () => {
+      const theme = document.body.dataset.theme || 'dark';
+      toggle.querySelector('[data-label]').textContent = theme.toUpperCase();
+    };
+
+    const cycleTheme = () => {
+      const order = ['auto', 'dark', 'light'];
+      const idx = order.indexOf(AppState.settings.theme);
+      AppState.settings.theme = order[(idx + 1) % order.length];
+      saveSettings();
+      applyTheme();
+      updateLabel();
+    };
+
+    toggle.addEventListener('click', cycleTheme);
+    toggle.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        cycleTheme();
+      }
+    });
+
+    const prefersListener = () => {
+      if (AppState.settings.theme === 'auto') {
+        applyTheme();
+        updateLabel();
+      }
+    };
+
+    if (typeof prefersDark.addEventListener === 'function') {
+      prefersDark.addEventListener('change', prefersListener);
+    } else if (typeof prefersDark.addListener === 'function') {
+      prefersDark.addListener(prefersListener);
+    }
+
+    updateLabel();
+  }
+
+  function initSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const toggle = document.querySelector('.sidebar-toggle');
+    if (!sidebar || !toggle) return;
+
+    const setState = (open) => {
+      sidebar.classList.toggle('open', open);
+      sidebar.classList.toggle('collapsed', !open);
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.innerHTML = open ? '&#x2715;' : '&#9776;';
+    };
+
+    toggle.addEventListener('click', () => {
+      const open = !sidebar.classList.contains('open');
+      setState(open);
+    });
+
+    // start collapsed on mobile
+    if (window.innerWidth < 880) {
+      setState(false);
+    } else {
+      sidebar.classList.add('open');
+    }
+  }
+
+  function qs(id) {
+    return document.querySelector(id);
+  }
+
+  function updateStatsView(data) {
+    AppState.stats = data;
+    const totalHosts = qs('[data-stat="total-hosts"]');
+    const totalServices = qs('[data-stat="total-services"]');
+    const lastSync = qs('[data-stat="last-sync"]');
+    if (totalHosts) totalHosts.textContent = data.total_hosts?.toLocaleString() ?? '—';
+    if (totalServices) totalServices.textContent = data.total_services?.toLocaleString() ?? '—';
+    if (lastSync) lastSync.textContent = data.last_sync ? new Date(data.last_sync).toLocaleString() : '—';
+
+    renderTable('[data-table="countries"]', data.countries);
+    renderTable('[data-table="services"]', data.services);
+    updateCharts(data);
+    renderHeatmap(data);
+  }
+
+  function renderTable(selector, objectData) {
+    const container = qs(selector);
+    if (!container) return;
+    const tbody = container.querySelector('tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!objectData) return;
+    Object.entries(objectData)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([key, value]) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td>${key}</td><td>${Number(value).toLocaleString()}</td>`;
+        tbody.appendChild(row);
+      });
+  }
+
+  async function fetchCensysSummary(silent = false) {
+    const endpoint = AppState.settings.backendUrl || '/api/censys-summary';
+    try {
+      const res = await fetch(endpoint, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      window.__latestCensys = data;
+      updateStatsView(data);
+      logTerminal(`Fetched stats from ${endpoint}`);
+    } catch (err) {
+      if (!silent) {
+        logTerminal(`Error fetching stats: ${err.message}`);
+      }
+      console.warn('Censys fetch error', err);
+    }
+  }
+
+  function initAutoRefresh() {
+    fetchCensysSummary();
+    setInterval(() => fetchCensysSummary(true), 60000);
+  }
+
+  function initCharts() {
+    const servicesCtx = document.getElementById('servicesChart');
+    const countriesCtx = document.getElementById('countriesChart');
+    if (servicesCtx && window.Chart) {
+      AppState.charts.services = new Chart(servicesCtx.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Services',
+            data: [],
+            backgroundColor: generateColorPalette(12, 'services'),
+            borderWidth: 1
+          }]
+        },
+        options: {
+          plugins: {
+            legend: { labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text') } }
+          }
+        }
+      });
+    }
+
+    if (countriesCtx && window.Chart) {
+      AppState.charts.countries = new Chart(countriesCtx.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: [],
+          datasets: [{
+            label: 'Hosts',
+            data: [],
+            backgroundColor: generateColorPalette(12, 'countries')
+          }]
+        },
+        options: {
+          scales: {
+            x: { ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--text') } },
+            y: { ticks: { color: getComputedStyle(document.documentElement).getPropertyValue('--text') } }
+          },
+          plugins: {
+            legend: { labels: { color: getComputedStyle(document.documentElement).getPropertyValue('--text') } }
+          }
+        }
+      });
+    }
+  }
+
+  function updateCharts(data) {
+    if (!data) return;
+    if (AppState.charts.services) {
+      const chart = AppState.charts.services;
+      const entries = Object.entries(data.services || {}).sort((a, b) => b[1] - a[1]);
+      chart.data.labels = entries.map(([service]) => service);
+      chart.data.datasets[0].data = entries.map(([, count]) => count);
+      chart.data.datasets[0].backgroundColor = generateColorPalette(entries.length || 1, 'services');
+      chart.update('none');
+    }
+
+    if (AppState.charts.countries) {
+      const chart = AppState.charts.countries;
+      const entries = Object.entries(data.countries || {}).sort((a, b) => b[1] - a[1]).slice(0, 12);
+      chart.data.labels = entries.map(([country]) => country);
+      chart.data.datasets[0].data = entries.map(([, count]) => count);
+      chart.data.datasets[0].backgroundColor = generateColorPalette(entries.length || 1, 'countries');
+      chart.update('none');
+    }
+  }
+
+  function generateColorPalette(count, seed) {
+    const baseHue = seed === 'services' ? 180 : 300;
+    return Array.from({ length: count }, (_, idx) => `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`);
+  }
+
+  function initTerminal() {
+    const terminal = document.querySelector('.terminal');
+    if (!terminal) return;
+
+    const output = terminal.querySelector('.terminal-output');
+    const input = terminal.querySelector('input');
+    const runButton = terminal.querySelector('button');
+
+    const commands = {
+      help() {
+        return 'Available commands: help, stats, theme <auto|dark|light>, settings, plugins';
+      },
+      stats() {
+        fetchCensysSummary();
+        return 'Refreshing Censys summary...';
+      },
+      theme(arg) {
+        if (!['auto', 'dark', 'light'].includes(arg)) {
+          return 'Usage: theme <auto|dark|light>';
+        }
+        AppState.settings.theme = arg;
+        saveSettings();
+        applyTheme();
+        return `Theme changed to ${arg}`;
+      },
+      settings() {
+        return JSON.stringify(AppState.settings, null, 2);
+      },
+      plugins() {
+        return `Registered plugins: ${AppPlugins.list().join(', ') || 'none'}`;
+      }
+    };
+
+    const execute = () => {
+      const [command, ...rest] = input.value.trim().split(/\s+/);
+      if (!command) return;
+      const arg = rest.join(' ');
+      const handler = commands[command] || AppPlugins.getCommand(command);
+      let response = '';
+      if (handler) {
+        try {
+          const result = handler(arg, { state: AppState, log: logTerminal });
+          if (result instanceof Promise) {
+            result.then(res => logTerminal(res ?? 'done'));
+          } else {
+            response = result ?? 'done';
+          }
+        } catch (err) {
+          response = `Error: ${err.message}`;
+        }
+      } else {
+        response = `Unknown command: ${command}`;
+      }
+      if (response) logTerminal(response);
+      input.value = '';
+    };
+
+    runButton?.addEventListener('click', execute);
+    input?.addEventListener('keydown', (evt) => {
+      if (evt.key === 'Enter') execute();
+    });
+
+    logTerminal('Terminal online. Type "help" to explore.');
+  }
+
+  function logTerminal(message) {
+    const output = document.querySelector('.terminal-output');
+    if (!output) return;
+    const line = document.createElement('div');
+    const timestamp = new Date().toLocaleTimeString();
+    line.textContent = `[${timestamp}] ${message}`;
+    output.appendChild(line);
     output.scrollTop = output.scrollHeight;
   }
 
-  log("Type 'help' for available commands.");
+  function initDataVisualizer() {
+    const jsonInput = document.getElementById('dataInput');
+    const fileInput = document.getElementById('fileInput');
+    const renderBtn = document.getElementById('renderData');
+    const output = document.getElementById('dataOutput');
 
-  input.addEventListener('keydown', e=>{
-    if(e.key === 'Enter'){
-      const cmd = input.value.trim();
-      input.value = '';
-      if(!cmd) return;
-      log("net-observation> " + cmd);
-      handleCommand(cmd, log);
-    }
-  });
-}
+    const parseCSV = (text) => {
+      const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+      const headers = headerLine.split(',').map(h => h.trim());
+      return rows.map(row => {
+        const values = row.split(',');
+        return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+      });
+    };
 
-function handleCommand(cmd, log){
-  const parts = cmd.split(/\s+/);
-  const main = parts[0].toLowerCase();
-  if(main === 'help'){
-    log("Commands: help, stats, theme dark, theme light, plugins, reload");
-  } else if(main === 'stats'){
-    const cfg = loadConfig();
-    log("Endpoint: " + (cfg.endpoint || '/api/censys-summary'));
-    log("Interval: " + (cfg.interval || 60) + "s");
-  } else if(main === 'theme'){
-    const arg = (parts[1] || '').toLowerCase();
-    if(arg === 'dark'){ document.body.classList.add('dark'); document.body.classList.remove('light'); saveTheme('dark'); }
-    else if(arg === 'light'){ document.body.classList.add('light'); document.body.classList.remove('dark'); saveTheme('light'); }
-    log("Theme set to " + arg);
-  } else if(main === 'plugins'){
-    if(window.NET_OBS_PLUGINS && window.NET_OBS_PLUGINS.length){
-      window.NET_OBS_PLUGINS.forEach(p=>log("Plugin: " + p.id + " – " + p.title));
-    } else {
-      log("No plugins registered.");
-    }
-  } else if(main === 'reload'){
-    loadLiveStatsOnce();
-    log("Reloaded live stats.");
-  } else {
-    log("Unknown command.");
-  }
-}
+    const renderData = (data) => {
+      if (!output) return;
+      output.innerHTML = '<pre></pre>';
+      output.querySelector('pre').textContent = JSON.stringify(data, null, 2);
+    };
 
-function saveTheme(t){
-  localStorage.setItem('netobs_theme', t);
-}
+    const processText = (text) => {
+      try {
+        const trimmed = text.trim();
+        if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+          renderData(JSON.parse(trimmed));
+        } else {
+          renderData(parseCSV(trimmed));
+        }
+        logTerminal('Data visualizer rendered input successfully.');
+      } catch (err) {
+        logTerminal(`Data visualizer error: ${err.message}`);
+      }
+    };
 
-// Plugin system
-window.NET_OBS_PLUGINS = window.NET_OBS_PLUGINS || [];
+    renderBtn?.addEventListener('click', () => {
+      if (!jsonInput?.value) return;
+      processText(jsonInput.value);
+    });
 
-// example plugin
-window.NET_OBS_PLUGINS.push({
-  id: 'demo-top-asn',
-  title: 'Top ASNs (demo)',
-  render: function(container){
-    const div = document.createElement('div');
-    div.className = 'card';
-    div.innerHTML = '<h3>Top ASNs (demo)</h3><p>AS13335 (Cloudflare)<br>AS15169 (Google)<br>AS16509 (Amazon)</p>';
-    container.appendChild(div);
-  }
-});
-
-function renderPlugins(){
-  const grid = document.getElementById('pluginGrid');
-  if(!grid || !window.NET_OBS_PLUGINS) return;
-  grid.innerHTML = '';
-  window.NET_OBS_PLUGINS.forEach(p=>{
-    if(typeof p.render === 'function'){
-      p.render(grid);
-    }
-  });
-}
-
-// Data visualizer
-function renderData(){
-  const input = document.getElementById('dataInput');
-  const out = document.getElementById('dataOutput');
-  const summary = document.getElementById('dataSummary');
-  if(!input || !out || !summary) return;
-
-  let text = input.value.trim();
-  if(!text){
-    out.innerHTML = '';
-    summary.textContent = 'No data.';
-    return;
-  }
-
-  let rows = [];
-  let mode = 'json';
-  try{
-    const parsed = JSON.parse(text);
-    if(Array.isArray(parsed)){
-      rows = parsed;
-    } else {
-      rows = [parsed];
-    }
-  } catch(e){
-    mode = 'csv';
-  }
-
-  if(mode === 'csv'){
-    const lines = text.split(/\r?\n/).filter(Boolean);
-    const headers = lines[0].split(',').map(s=>s.trim());
-    rows = lines.slice(1).map(line=>{
-      const cols = line.split(',');
-      const obj = {};
-      headers.forEach((h,i)=>{ obj[h] = cols[i] || ''; });
-      return obj;
+    fileInput?.addEventListener('change', (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => processText(reader.result);
+      reader.readAsText(file);
     });
   }
 
-  if(!rows.length){
-    out.innerHTML = '';
-    summary.textContent = 'No rows parsed.';
-    return;
-  }
+  const AppPlugins = (() => {
+    const registry = new Map();
+    return {
+      register(plugin) {
+        if (!plugin?.name) throw new Error('Plugin requires a name');
+        registry.set(plugin.name, plugin);
+        plugin?.init?.({ state: AppState, log: logTerminal });
+        if (plugin.command) {
+          registry.set(plugin.command, plugin);
+        }
+        logTerminal(`Plugin registered: ${plugin.name}`);
+      },
+      list() {
+        return Array.from(new Set(Array.from(registry.values()).map(p => p.name)));
+      },
+      getCommand(name) {
+        const plugin = registry.get(name);
+        if (plugin && plugin.run) {
+          return (...args) => plugin.run(...args);
+        }
+        return null;
+      }
+    };
+  })();
 
-  const keys = Object.keys(rows[0]);
-  summary.textContent = `Parsed ${rows.length} rows with ${keys.length} columns.`;
+  window.registerPlugin = (plugin) => {
+    try {
+      AppPlugins.register(plugin);
+    } catch (err) {
+      logTerminal(`Plugin registration failed: ${err.message}`);
+    }
+  };
 
-  let html = '<table><thead><tr>';
-  keys.forEach(k=>{ html += '<th>'+k+'</th>'; });
-  html += '</tr></thead><tbody>';
-  rows.forEach(r=>{
-    html += '<tr>';
-    keys.forEach(k=>{ html += '<td>'+String(r[k])+'</td>'; });
-    html += '</tr>';
-  });
-  html += '</tbody></table>';
-  out.innerHTML = html;
-}
+  function initSettingsPanel() {
+    const panel = document.querySelector('.settings-panel');
+    const toggle = document.querySelector('.settings-toggle');
+    if (!panel || !toggle) return;
 
-function clearData(){
-  const input = document.getElementById('dataInput');
-  const out = document.getElementById('dataOutput');
-  const summary = document.getElementById('dataSummary');
-  if(input) input.value = '';
-  if(out) out.innerHTML = '';
-  if(summary) summary.textContent = 'Cleared.';
-}
+    const backendInput = panel.querySelector('[name="backendUrl"]');
+    const domainInput = panel.querySelector('[name="auth0Domain"]');
+    const clientIdInput = panel.querySelector('[name="auth0ClientId"]');
+    const themeSelect = panel.querySelector('[name="themeMode"]');
 
-// Auth0 front-end hooks (optional)
-let auth0Client = null;
+    backendInput.value = AppState.settings.backendUrl;
+    domainInput.value = AppState.settings.auth0Domain;
+    clientIdInput.value = AppState.settings.auth0ClientId;
+    themeSelect.value = AppState.settings.theme;
 
-async function initAuth0IfConfigured(){
-  const cfg = loadConfig();
-  if(!cfg.auth0Domain || !cfg.auth0Client || !window.createAuth0Client){
-    return;
-  }
-  try{
-    auth0Client = await createAuth0Client({
-      domain: cfg.auth0Domain,
-      clientId: cfg.auth0Client,
-      cacheLocation: 'localstorage'
+    panel.addEventListener('submit', (evt) => {
+      evt.preventDefault();
+      AppState.settings.backendUrl = backendInput.value.trim() || '/api/censys-summary';
+      AppState.settings.auth0Domain = domainInput.value.trim();
+      AppState.settings.auth0ClientId = clientIdInput.value.trim();
+      AppState.settings.theme = themeSelect.value;
+      saveSettings();
+      applyTheme();
+      initAuth0();
+      logTerminal('Settings saved.');
     });
-    const isAuth = await auth0Client.isAuthenticated();
-    updateAuthUI(isAuth);
-  } catch(e){
-    console.warn('Auth0 init failed (probably not configured):', e);
-  }
-}
 
-function updateAuthUI(isAuth){
-  const loginBtn = document.getElementById('authLoginBtn');
-  const logoutBtn = document.getElementById('authLogoutBtn');
-  const status = document.getElementById('authStatus');
-  if(!status) return;
-  if(isAuth){
-    if(loginBtn) loginBtn.classList.add('hidden');
-    if(logoutBtn) logoutBtn.classList.remove('hidden');
-    status.textContent = 'Auth: logged in';
+    toggle.addEventListener('click', () => {
+      panel.classList.toggle('hidden');
+      toggle.classList.toggle('active');
+      toggle.innerHTML = panel.classList.contains('hidden') ? '&#9881;' : '&#10006;';
+    });
+  }
+
+  async function initAuth0() {
+    if (!window.createAuth0Client) return;
+    if (!AppState.settings.auth0Domain || !AppState.settings.auth0ClientId) return;
+
+    try {
+      AppState.auth0Client = await createAuth0Client({
+        domain: AppState.settings.auth0Domain,
+        clientId: AppState.settings.auth0ClientId,
+        cacheLocation: 'localstorage',
+        authorizationParams: {
+          redirect_uri: window.location.origin
+        }
+      });
+      logTerminal('Auth0 client initialised.');
+      updateAuthControls();
+    } catch (err) {
+      logTerminal(`Auth0 init failed: ${err.message}`);
+    }
+  }
+
+  async function updateAuthControls() {
+    const loginBtn = document.querySelector('[data-action="login"]');
+    const logoutBtn = document.querySelector('[data-action="logout"]');
+    const status = document.querySelector('[data-auth-status]');
+    if (!AppState.auth0Client) {
+      loginBtn?.classList.add('hidden');
+      logoutBtn?.classList.add('hidden');
+      if (status) status.textContent = 'Anonymous';
+      return;
+    }
+
+    const isAuthenticated = await AppState.auth0Client.isAuthenticated();
+    if (status) status.textContent = isAuthenticated ? 'Authenticated' : 'Anonymous';
+    loginBtn?.classList.toggle('hidden', isAuthenticated);
+    logoutBtn?.classList.toggle('hidden', !isAuthenticated);
+
+    if (loginBtn && !loginBtn.dataset.bound) {
+      loginBtn.dataset.bound = 'true';
+      loginBtn.addEventListener('click', async () => {
+        await AppState.auth0Client.loginWithPopup();
+        updateAuthControls();
+        logTerminal('Logged in via Auth0.');
+      });
+    }
+
+    if (logoutBtn && !logoutBtn.dataset.bound) {
+      logoutBtn.dataset.bound = 'true';
+      logoutBtn.addEventListener('click', async () => {
+        await AppState.auth0Client.logout({ returnTo: window.location.href });
+        updateAuthControls();
+        logTerminal('Logged out of Auth0.');
+      });
+    }
+  }
+
+  async function renderHeatmap(data) {
+    const container = document.getElementById('worldHeatmap');
+    if (!container || !window.d3) return;
+    if (!window.topojson) {
+      logTerminal('TopoJSON library missing; heatmap unavailable.');
+      return;
+    }
+
+    if (!AppState.worldData) {
+      try {
+        const world = await d3.json('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json');
+        AppState.worldData = topojson.feature(world, world.objects.countries);
+      } catch (err) {
+        logTerminal('Failed to load world map data.');
+        return;
+      }
+    }
+
+    const svg = d3.select(container).attr('viewBox', '0 0 960 500');
+    svg.selectAll('*').remove();
+
+    const projection = d3.geoNaturalEarth1().fitWidth(960, { type: 'Sphere' });
+    const path = d3.geoPath(projection);
+    const countries = AppState.worldData.features;
+
+    const counts = data?.countries || {};
+    const values = Object.values(counts);
+    const max = values.length ? Math.max(...values) : 1;
+    const color = d3.scaleSequential(d3.interpolateTurbo).domain([0, max || 1]);
+
+    svg.append('path')
+      .attr('d', path({ type: 'Sphere' }))
+      .attr('fill', '#020314')
+      .attr('stroke', 'rgba(0,255,255,0.35)');
+
+    svg.selectAll('path.country')
+      .data(countries)
+      .join('path')
+      .attr('class', 'country')
+      .attr('d', path)
+      .attr('fill', d => {
+        const iso = d.properties.iso_a2 || d.properties.name;
+        return color(counts[iso] || 0);
+      })
+      .attr('stroke', 'rgba(0, 255, 255, 0.2)')
+      .append('title')
+      .text(d => {
+        const iso = d.properties.iso_a2 || d.properties.name;
+        const count = counts[iso] || 0;
+        return `${d.properties.name}: ${count}`;
+      });
+  }
+
+  function initDocsSidebar() {
+    const tocLinks = document.querySelectorAll('.docs-sidebar a');
+    tocLinks.forEach(link => {
+      link.addEventListener('click', (evt) => {
+        const id = link.getAttribute('href');
+        if (id.startsWith('#')) {
+          evt.preventDefault();
+          document.querySelector(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  }
+
+  function initVersionList() {
+    const container = document.querySelector('[data-version-list]');
+    if (!container) return;
+    const versions = [
+      { version: 'v2.3', status: 'current', notes: 'Stable release' },
+      { version: 'v2.2', status: 'lts', notes: 'Long-term support' },
+      { version: 'v2.1', status: 'legacy', notes: 'Security patches only' },
+      { version: 'v1.x', status: 'archived', notes: 'Historical data' }
+    ];
+    container.innerHTML = versions.map(v => `
+      <div class="card">
+        <span class="badge">${v.version} · ${v.status.toUpperCase()}</span>
+        <p>${v.notes}</p>
+      </div>`).join('');
+  }
+
+  function initPageSpecificFeatures() {
+    const page = document.body.dataset.page;
+    switch (page) {
+      case 'dashboard':
+        initCharts();
+        initAutoRefresh();
+        initTerminal();
+        initDataVisualizer();
+        break;
+      case 'docs':
+        initDocsSidebar();
+        initVersionList();
+        break;
+      case 'versions':
+        initVersionList();
+        break;
+      case 'api':
+        initTerminal();
+        initAutoRefresh();
+        break;
+      case 'data':
+        initDataVisualizer();
+        initAutoRefresh();
+        break;
+      default:
+        initAutoRefresh();
+        initTerminal();
+    }
+  }
+
+  function markActiveNav() {
+    const path = window.location.pathname.split('/').pop() || 'index.html';
+    document.querySelectorAll('nav a').forEach((link) => {
+      const href = link.getAttribute('href');
+      if (href === path || (path === 'index.html' && href === '/')) {
+        link.classList.add('active');
+      }
+    });
+  }
+
+  function init() {
+    loadSettings();
+    applyTheme();
+    initThemeToggle();
+    initSidebar();
+    initLogoPlaceholders();
+    initSettingsPanel();
+    initAuth0();
+    updateAuthControls();
+    markActiveNav();
+    initPageSpecificFeatures();
+    AppPlugins.register({
+      name: 'echo-plugin',
+      command: 'echo',
+      run(text) {
+        return text || '(empty)';
+      }
+    });
+  }
+
+  if (document.readyState !== 'loading') {
+    init();
   } else {
-    if(loginBtn) loginBtn.classList.remove('hidden');
-    if(logoutBtn) logoutBtn.classList.add('hidden');
-    status.textContent = 'Auth: anon';
+    document.addEventListener('DOMContentLoaded', init);
   }
-}
-
-async function bindAuthButtons(){
-  const loginBtn = document.getElementById('authLoginBtn');
-  const logoutBtn = document.getElementById('authLogoutBtn');
-  if(loginBtn){
-    loginBtn.onclick = async () => {
-      if(!auth0Client){ alert('Auth0 not configured in Settings.'); return; }
-      await auth0Client.loginWithRedirect({ redirect_uri: window.location.href });
-    };
-  }
-  if(logoutBtn){
-    logoutBtn.onclick = async () => {
-      if(!auth0Client) return;
-      await auth0Client.logout({ returnTo: window.location.href });
-      updateAuthUI(false);
-    };
-  }
-}
-
-// init on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
-  bindSettingsUI();
-  initTerminal();
-  startLiveLoop();
-  initAuth0IfConfigured();
-  bindAuthButtons();
-});
+})();

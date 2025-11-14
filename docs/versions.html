@@ -1,82 +1,126 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <title>Versions · Net Observation Project</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Release Versions · Net Observation Project</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+  <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/@auth0/auth0-spa-js@2.1.3/dist/auth0-spa-js.production.js"></script>
+  <script defer src="script.js"></script>
 </head>
-<body class="dark">
-<header class="neon-banner small">
-  <img src="logo.png" class="logo" alt="Logo">
-  <div class="banner-text">
-    <h1>Documentation Versions</h1>
-    <p class="subtitle">Track evolution of the research portal</p>
-  </div>
-</header>
-<div class="layout">
-  <aside class="sidebar collapsed">
-    <button class="collapse-btn" onclick="toggleSidebar()">☰</button>
-    <nav class="main-nav">
-      <a href="index.html">Home</a>
+<body data-page="versions">
+  <aside class="sidebar">
+    <img src="logo.png" alt="Net Observation Project" data-logo style="width:100%; border-radius:14px; margin-bottom:1rem;" />
+    <div class="theme-toggle" data-role="theme-toggle" role="button" tabindex="0">
+      <span>Theme:</span>
+      <strong data-label>AUTO</strong>
+    </div>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
       <a href="docs.html">Docs</a>
       <a href="api.html">API</a>
-      <a href="dashboard.html">Dashboard</a>
-      <a href="data.html">Data Visualizer</a>
-      <a href="versions.html" class="active">Versions</a>
+      <a href="data.html">Data Lab</a>
+      <a href="versions.html">Versions</a>
     </nav>
-    <hr>
-    <nav class="version-nav">
-      <div class="nav-header">Docs Versions</div>
-      <a href="#">v1.0 · Public</a>
-      <a href="#" class="disabled">v1.1 · WIP</a>
-      <a href="#" class="disabled">v2.0 · Future</a>
-    </nav>
-    <hr>
-    <button class="theme-btn" onclick="toggleTheme()">Toggle Theme</button>
-    <button class="settings-btn" onclick="toggleSettings()">Settings</button>
   </aside>
+  <button class="sidebar-toggle" aria-label="Toggle navigation" aria-expanded="true">&#x2715;</button>
+
+  <header>
+    <div style="display:flex;align-items:center;gap:1rem;">
+      <img src="logo.png" alt="Net Observation" class="logo" data-logo />
+      <div>
+        <h1 style="margin:0;font-size:1.2rem;letter-spacing:0.08em;">Release Versions</h1>
+        <p style="margin:0;color:var(--text-muted);font-size:0.85rem;">Track major milestones and change history</p>
+      </div>
+    </div>
+    <nav class="primary-nav">
+      <a href="index.html">Overview</a>
+      <a href="dashboard.html">Dashboard</a>
+      <a href="docs.html">Docs</a>
+      <a href="api.html">API</a>
+      <a href="data.html">Data Lab</a>
+      <a href="versions.html">Versions</a>
+      <span class="badge" data-auth-status>Anonymous</span>
+      <button data-action="login" class="badge" style="cursor:pointer; background:rgba(0,255,255,0.12);">Login</button>
+      <button data-action="logout" class="badge hidden" style="cursor:pointer; background:rgba(255,0,255,0.12);">Logout</button>
+    </nav>
+  </header>
+
   <main>
-    <section>
-      <h2>Current</h2>
-      <ul>
-        <li><strong>v1.0</strong> – Initial public docs, dashboard, data visualizer, and plugin system.</li>
-      </ul>
+    <section class="card">
+      <h2>Roadmap</h2>
+      <h3>Planned releases</h3>
+      <div data-version-list class="grid two"></div>
     </section>
-    <section>
-      <h2>Planned</h2>
-      <ul>
-        <li>v1.1 – Wired to real Censys summary backend, more charts.</li>
-        <li>v2.0 – Per-ASN, per-country deep dives, saved views, and downloads.</li>
-      </ul>
+
+    <section class="card">
+      <h2>Changelog</h2>
+      <h3>Highlights per release</h3>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Version</th>
+              <th>Date</th>
+              <th>Highlights</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>v2.3</td>
+              <td>2025-01-12</td>
+              <td>AI-assisted anomaly detection, plugin sandboxing, improved Auth0 session handling.</td>
+            </tr>
+            <tr>
+              <td>v2.2</td>
+              <td>2024-10-02</td>
+              <td>Expanded Censys aggregation, world heatmap optimisations, CSV transformer.</td>
+            </tr>
+            <tr>
+              <td>v2.1</td>
+              <td>2024-06-15</td>
+              <td>Modular plugin engine, terminal macros, Chart.js auto-refresh.</td>
+            </tr>
+            <tr>
+              <td>v1.9</td>
+              <td>2023-12-20</td>
+              <td>Initial Cloudflare Pages Functions integration and dark neon interface.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Version Policy</h2>
+      <h3>Lifecycle cadence</h3>
+      <p>Major releases (vX.0) introduce structural enhancements while minor releases (vX.Y) focus on iterative telemetry improvements. Legacy branches remain patchable for six months after a major release to maintain enterprise stability.</p>
     </section>
   </main>
-</div>
 
-<div id="settingsPanel" class="settings-panel hidden">
-  <div class="settings-inner">
-    <h2>Settings / Config</h2>
-    <p>Shared across all pages via localStorage.</p>
-    <label>Backend summary endpoint:<br>
-      <input id="cfgEndpoint" placeholder="/api/censys-summary">
-    </label>
-    <label>Refresh interval (seconds):<br>
-      <input id="cfgInterval" type="number" min="5" max="3600" step="5">
-    </label>
-    <h3>Auth0</h3>
-    <label>Auth0 Domain:<br>
-      <input id="cfgAuthDomain" placeholder="YOUR-TENANT.eu.auth0.com">
-    </label>
-    <label>Auth0 Client ID:<br>
-      <input id="cfgAuthClient" placeholder="YOUR_CLIENT_ID">
-    </label>
-    <button id="cfgSaveBtn">Save Settings</button>
-    <button id="cfgCloseBtn" class="ghost-btn" onclick="toggleSettings()">Close</button>
-  </div>
-</div>
-
-<footer>
-  <p>Versions · Net Observation Project 🧬</p>
-</footer>
+  <button class="settings-toggle">&#9881;</button>
+  <form class="settings-panel hidden">
+    <h4>System Settings</h4>
+    <label for="backendUrl">Backend Endpoint</label>
+    <input id="backendUrl" name="backendUrl" type="url" placeholder="https://example.com/api/censys-summary" />
+    <label for="auth0Domain">Auth0 Domain</label>
+    <input id="auth0Domain" name="auth0Domain" type="text" placeholder="tenant.eu.auth0.com" />
+    <label for="auth0ClientId">Auth0 Client ID</label>
+    <input id="auth0ClientId" name="auth0ClientId" type="text" placeholder="abc123XYZ" />
+    <label for="themeMode">Theme Mode</label>
+    <select id="themeMode" name="themeMode">
+      <option value="auto">Auto</option>
+      <option value="dark">Dark</option>
+      <option value="light">Light</option>
+    </select>
+    <button type="submit">Save Settings</button>
+  </form>
 </body>
 </html>
