@@ -1,0 +1,1 @@
+SELECT issuer, COUNT(*) FROM certificates GROUP BY issuer ORDER BY 2 DESC LIMIT 50;
