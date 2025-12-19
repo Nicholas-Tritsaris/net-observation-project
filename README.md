@@ -101,3 +101,20 @@ registerPlugin({
 ```
 
 Plugins can provide new terminal commands, react to telemetry updates via the shared app state, and stream output to the command console using the `log` helper passed to each `run` invocation.
+
+## Testing
+
+This project includes a comprehensive test suite covering all functionality. To run the tests:
+
+```bash
+npm install
+npm test
+```
+
+For coverage reports:
+
+```bash
+npm run test:coverage
+```
+
+See [TEST_SUMMARY.md](TEST_SUMMARY.md) for detailed test documentation.
