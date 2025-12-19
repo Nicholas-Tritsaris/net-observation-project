@@ -147,11 +147,10 @@
   }
 
   /**
-   * Initialize the page sidebar's collapse/expand behavior and its toggle control.
+   * Initialize the sidebar toggle so users can collapse and expand the page sidebar.
    *
-   * Adds a click handler to the sidebar toggle that toggles `open`/`collapsed` classes on the sidebar,
-   * updates the toggle's `aria-expanded` attribute and icon, and sets the initial state (collapsed when
-   * window width is less than 880px).
+   * Wires a click handler that toggles the sidebar's 'open' and 'collapsed' classes, updates the toggle's
+   * `aria-expanded` attribute and icon, and sets the initial state (collapsed when window width is less than 880px).
    */
   function initSidebar() {
     const sidebar = document.querySelector('.sidebar');
@@ -179,9 +178,9 @@
   }
 
   /**
-   * Return the first DOM element that matches the provided CSS selector.
-   * @param {string} id - CSS selector string to match against the document.
-   * @returns {Element|null} The first matching Element, or `null` if no element matches.
+   * Get the first element in the document that matches the given CSS selector.
+   * @param {string} id - CSS selector to match.
+   * @returns {Element|null} The first matching element, or `null` if none is found.
    */
   function qs(id) {
     return document.querySelector(id);
@@ -213,15 +212,11 @@
   }
 
   /**
-   * Populate a table's tbody with rows from an object's entries sorted by value descending.
+   * Render rows into a table's tbody from an object's entries sorted by value (descending).
    *
-   * Clears the target tbody and appends one <tr> per entry where the first <td> is the object key
-   * and the second <td> is the numeric value formatted with Number(...).toLocaleString().
-   * No changes are made if the selector does not match an element, the element has no tbody,
-   * or if `objectData` is falsy.
-   *
-   * @param {string} selector - CSS selector for a table element that contains a <tbody>.
-   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; values are sorted descending and formatted with locale separators.
+   * Clears the tbody and appends one <tr> per entry where the first <td> is the key and the second <td> is the value formatted with locale separators. If the selector doesn't match, the table has no tbody, or `objectData` is falsy, no changes are made.
+   * @param {string} selector - CSS selector for the target table element containing a <tbody>.
+   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; entries are sorted by value descending and formatted with toLocaleString().
    */
   function renderTable(selector, objectData) {
     const container = qs(selector);
@@ -331,12 +326,10 @@
   }
 
   /**
-   * Update the Chart.js service and country charts to reflect the provided summary data.
+   * Update the Chart.js service and country charts to reflect provided summary data.
    *
-   * Services are sorted by count (descending) and fully applied to the services chart.
-   * Countries are sorted by count (descending) and the top 12 are applied to the countries chart.
-   * Labels, dataset values, and dataset background colors are replaced and charts are refreshed.
-   * @param {Object} data - Summary data with optional properties `services` and `countries`, each a mapping of name to count (e.g., `{ services: { http: 10 }, countries: { US: 5 } }`).
+   * Services are replaced by all service entries sorted by count descending; countries are replaced by the top 12 country entries sorted by count descending.
+   * @param {Object} data - Summary object that may include `services` and `countries` properties, each a mapping from name/code to numeric count (e.g. `{ services: { http: 10 }, countries: { US: 5 } }`).
    */
   function updateCharts(data) {
     if (!data) return;
@@ -371,13 +364,11 @@
   }
 
   /**
-   * Initializes the in-page terminal UI, wiring command handlers, event listeners, and startup message.
+   * Initialize the in-page terminal UI and wire built-in and plugin commands.
    *
-   * When a .terminal element exists, this sets up the input, run button, and a set of built-in commands
-   * (help, stats, theme, settings, plugins), integrates plugin-provided commands, and logs a ready message.
-   * Binds click and Enter key handlers to execute commands and appends command output to the terminal.
-   *
-   * If no .terminal element is present, the function returns without side effects.
+   * When a .terminal element exists, sets up its input, run button, and command execution handler,
+   * registers the built-in commands (help, stats, theme, settings, plugins), integrates plugin-provided commands,
+   * and logs a ready message. If no .terminal element is present, the function performs no action.
    */
   function initTerminal() {
     const terminal = document.querySelector('.terminal');
@@ -460,11 +451,12 @@
   }
 
   /**
-   * Initialize the data visualizer UI to parse and display JSON or CSV input.
+   * Initialize the data visualizer UI and wire inputs for parsing and rendering user-provided data.
    *
-   * Wires the text input, file input, and render button so provided text or uploaded files
-   * are parsed as JSON (if the text starts with `{` or `[`) or as CSV otherwise, then
-   * rendered into the output area and logged to the in-page terminal.
+   * Attaches handlers to the text input, file input, and render button so that supplied text or
+   * uploaded files are parsed and displayed in the data output area. Input starting with `{` or `[`
+   * is parsed as JSON; all other input is parsed as CSV using the first row as headers. Successful
+   * renders and parse errors are reported to the in-page terminal via logTerminal.
    */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
@@ -616,14 +608,12 @@
   }
 
   /**
-   * Update authentication UI controls to reflect the current Auth0 client and sign-in state.
+   * Update authentication UI to reflect Auth0 client presence and the user's sign-in state.
    *
-   * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
-   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and attaches click
-   * handlers that perform Auth0 login (popup) and logout (returning to the current page).
-   *
-   * Click handlers are attached at most once per button.
-   */
+   * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous", toggles
+   * visibility of the buttons [data-action="login"] and [data-action="logout"], and attaches
+   * one-time click handlers that perform Auth0 login (popup) and logout (returning to the
+   * current page). */
   async function updateAuthControls() {
     const loginBtn = document.querySelector('[data-action="login"]');
     const logoutBtn = document.querySelector('[data-action="logout"]');
@@ -660,13 +650,12 @@
   }
 
   /**
-   * Render a world choropleth heatmap into the element with id "worldHeatmap".
+   * Render a world choropleth heatmap showing numeric counts per country inside the element with id "worldHeatmap".
    *
-   * Renders country fill colors based on per-country numeric counts and caches loaded world topology for subsequent calls.
-   * Requires D3 and TopoJSON to be available on window; if the world topology has not been loaded it will be fetched and stored on AppState.worldData.
+   * Loads and caches world topology if not already present and requires D3 and TopoJSON on window to render; if either library is missing the function is a no-op and logs a message to the terminal.
    *
    * @param {Object} data - Data used to color the map.
-   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
+   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (prefer ISO A2 code or country name) to numeric counts used to determine fill color.
    */
   async function renderHeatmap(data) {
     const container = document.getElementById('worldHeatmap');
@@ -806,10 +795,9 @@
   }
 
   /**
-   * Highlights the navigation link that corresponds to the current page.
+   * Mark navigation links whose href matches the current page as active.
    *
-   * Compares the last segment of window.location.pathname (or "index.html" for root)
-   * against each nav anchor's href and adds the `active` class to matching links.
+   * Determines the current page by using the last segment of window.location.pathname (or "index.html" for the site root) and adds the `active` class to any <a> inside <nav> whose href equals that segment; treats a nav href of "/" as matching the root.
    */
   function markActiveNav() {
     const path = window.location.pathname.split('/').pop() || 'index.html';
