@@ -21,14 +21,13 @@ wrangler.toml.local
 # Generated assets
 *.tmp
 
-# Testing
+# Test coverage and reports
 coverage/
 .nyc_output/
-*.lcov
 test-results/
-junit.xml
+playwright-report/
+html-report/
 
-# Package manager
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# Test artifacts
+*.test.log
+.vitest/
