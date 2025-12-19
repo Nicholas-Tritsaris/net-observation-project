@@ -21,9 +21,9 @@
   /**
    * Load persisted settings from localStorage and merge them into AppState.settings.
    *
-   * If a stored settings object exists under STORAGE_KEY, its properties are shallow-merged
-   * into the existing AppState.settings. On JSON parse or storage access errors a warning
-   * is logged and AppState.settings is left unchanged.
+   * If an object is stored under STORAGE_KEY, its top-level properties are shallow-merged
+   * into AppState.settings. If reading or parsing the stored value fails, a warning is
+   * logged and AppState.settings remains unchanged.
    */
   function loadSettings() {
     try {
@@ -146,11 +146,12 @@
   }
 
   /**
-   * Initialize the page sidebar's collapse/expand behavior and its toggle control.
+   * Initialize and enable toggle behavior for the page sidebar.
    *
-   * Adds a click handler to the sidebar toggle that toggles `open`/`collapsed` classes on the sidebar,
-   * updates the toggle's `aria-expanded` attribute and icon, and sets the initial state (collapsed when
-   * window width is less than 880px).
+   * Sets up the sidebar so it can be opened and collapsed via the sidebar toggle control.
+   * The control updates the sidebar's CSS state classes, the toggle's `aria-expanded` attribute,
+   * and the toggle icon. On initialization the sidebar starts collapsed when the viewport width
+   * is less than 880px, otherwise it starts open.
    */
   function initSidebar() {
     const sidebar = document.querySelector('.sidebar');
@@ -369,13 +370,11 @@
   }
 
   /**
-   * Initializes the in-page terminal UI, wiring command handlers, event listeners, and startup message.
+   * Initialize the in-page terminal UI and register built-in and plugin commands.
    *
-   * When a .terminal element exists, this sets up the input, run button, and a set of built-in commands
-   * (help, stats, theme, settings, plugins), integrates plugin-provided commands, and logs a ready message.
-   * Binds click and Enter key handlers to execute commands and appends command output to the terminal.
-   *
-   * If no .terminal element is present, the function returns without side effects.
+   * Sets up the terminal output, input, run button, command dispatching (including built-in commands
+   * like help, stats, theme, settings, plugins and plugin-provided commands), keyboard and click
+   * handlers, and logs a startup message. No-op if no `.terminal` element is present.
    */
   function initTerminal() {
     const terminal = document.querySelector('.terminal');
@@ -617,14 +616,15 @@
   }
 
   /**
-   * Update authentication UI controls based on the current Auth0 client and sign-in state.
+   * Update visible authentication UI to reflect current Auth0 client and sign-in state.
    *
-   * Sets the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
-   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and binds click
-   * handlers that perform Auth0 login (popup) and logout (returning to the current page).
+   * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
+   * the [data-action="login"] and [data-action="logout"] controls accordingly, and binds click
+   * handlers that perform Auth0 login (popup) and logout (returning to the current page) and then
+   * refresh the controls.
    *
-   * If no Auth0 client is available, both buttons are hidden and the status is set to "Anonymous".
-   * Click handlers are bound only once per button (marked via a data-bound flag).
+   * If no Auth0 client is configured, both buttons are hidden and the status is set to "Anonymous".
+   * Click handlers are attached only once per button to avoid duplicate bindings.
    */
   async function updateAuthControls() {
     const loginBtn = document.querySelector('[data-action="login"]');
@@ -662,13 +662,13 @@
   }
 
   /**
-   * Render a world choropleth heatmap into the element with id "worldHeatmap".
+   * Render a world choropleth into the element with id "worldHeatmap" using per-country numeric counts.
    *
-   * Renders country fill colors based on per-country numeric counts and caches loaded world topology for subsequent calls.
-   * Requires D3 and TopoJSON to be available on window; if the world topology has not been loaded it will be fetched and stored on AppState.worldData.
+   * Colors each country according to the provided counts and caches loaded world topology on AppState.worldData for reuse.
+   * The function is a no-op if the target container or required libraries (D3, TopoJSON) are not available.
    *
    * @param {Object} data - Data used to color the map.
-   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
+   * @param {Object<string, number>} [data.countries] - Mapping from country identifier (preferred ISO A2 code or country name) to a numeric count used to determine fill color.
    */
   async function renderHeatmap(data) {
     const container = document.getElementById('worldHeatmap');
@@ -808,9 +808,9 @@
   }
 
   /**
-   * Highlights the navigation link that corresponds to the current page.
+   * Highlight the navigation link that corresponds to the current page.
    *
-   * Compares the last segment of window.location.pathname (or "index.html" for root)
+   * Compares the last segment of window.location.pathname (uses "index.html" for a root path)
    * against each nav anchor's href and adds the `active` class to matching links.
    */
   function markActiveNav() {
@@ -824,12 +824,11 @@
   }
 
   /**
-   * Bootstraps the application's UI, services, and plugins on page load.
+   * Initialize and bootstrap the application's settings, UI controls, services, and plugins on page load.
    *
-   * Performs the startup sequence: loads persisted settings, applies the resolved theme,
-   * wires theme toggle and sidebar controls, initializes logo placeholders and the settings panel,
-   * initializes Auth0 and updates authentication controls, marks the active navigation link,
-   * initializes page-specific features, and registers a default "echo-plugin".
+   * Loads persisted settings, resolves and applies the theme, wires theme toggle and sidebar controls,
+   * initializes logo placeholders and the settings panel, initializes Auth0 and authentication controls,
+   * marks the active navigation item, starts page-specific features, and registers a default "echo-plugin".
    */
   function init() {
     loadSettings();
