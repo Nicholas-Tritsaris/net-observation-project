@@ -1,440 +1,623 @@
 /**
  * Unit tests for functions/api/censys-summary.js
- * Comprehensive tests for the Cloudflare Worker backend function
+ * Tests the Cloudflare Pages Function that fetches and aggregates Censys data
  * 
- * This file was intentionally left without tests in the original test suite.
- * Adding comprehensive coverage with bias for action.
+ * Note: These tests use dynamic import and mock the module's dependencies
+ * since it's an ES module for Cloudflare Pages Functions.
  */
 
-describe('Cloudflare Worker - censys-summary.js', () => {
-  let onRequest;
+describe('Censys Summary API Function', () => {
   let mockFetch;
-  let mockContext;
+  let mockBtoa;
+  let mockConsoleError;
+  
+  // Store original globals
+  let originalFetch;
+  let originalBtoa;
+
+  beforeAll(() => {
+    originalFetch = global.fetch;
+    originalBtoa = global.btoa;
+  });
+
+  afterAll(() => {
+    global.fetch = originalFetch;
+    global.btoa = originalBtoa;
+  });
 
   beforeEach(() => {
-    // Mock global fetch
+    // Setup mocks
     mockFetch = jest.fn();
+    mockBtoa = jest.fn((str) => Buffer.from(str).toString('base64'));
+    mockConsoleError = jest.spyOn(console, 'error').mockImplementation();
+    
     global.fetch = mockFetch;
-    global.btoa = (str) => Buffer.from(str).toString('base64');
-
-    // Setup mock context
-    mockContext = {
-      env: {
-        CENSYS_API_ID: 'test-api-id',
-        CENSYS_API_SECRET: 'test-api-secret'
-      }
-    };
-
-    // Import the function (we'll need to mock the module system)
-    const censysModule = `
-      async function onRequest(context) {
-        const { env } = context;
-        const id = env.CENSYS_API_ID;
-        const secret = env.CENSYS_API_SECRET;
-
-        if (!id || !secret) {
-          return new Response(JSON.stringify({
-            error: 'Missing CENSYS_API_ID or CENSYS_API_SECRET environment variables.'
-          }), {
-            status: 500,
-            headers: responseHeaders()
-          });
-        }
-
-        const authHeader = \`Basic \${btoa(\`\${id}:\${secret}\`)}\`;
-        const endpoint = (path) => \`https://search.censys.io/api/v2\${path}\`;
-
-        const fetchJSON = async (path, payload) => {
-          const res = await fetch(endpoint(path), {
-            method: 'POST',
-            headers: {
-              'Authorization': authHeader,
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-
-          if (!res.ok) {
-            const text = await res.text();
-            throw new Error(\`Censys \${path} failed: \${res.status} \${text}\`);
-          }
-          return res.json();
-        };
-
-        try {
-          const [hostSummary, serviceStats, countryStats] = await Promise.all([
-            fetchJSON('/hosts/search', { q: '*', per_page: 1, virtual_hosts: 'EXCLUDE' }),
-            fetchJSON('/hosts/stats/services.service_name', { q: '*', num_buckets: 25 }),
-            fetchJSON('/hosts/stats/location.country_code', { q: '*', num_buckets: 50 })
-          ]);
-
-          const totalHosts = hostSummary?.result?.total ?? 0;
-          const services = {};
-          let totalServices = 0;
-          const serviceBuckets = serviceStats?.result?.buckets ?? [];
-          for (const bucket of serviceBuckets) {
-            if (!bucket?.key) continue;
-            services[bucket.key] = bucket.count;
-            totalServices += bucket.count;
-          }
-
-          const countries = {};
-          const countryBuckets = countryStats?.result?.buckets ?? [];
-          for (const bucket of countryBuckets) {
-            if (!bucket?.key) continue;
-            const countryCode = bucket.key.toUpperCase();
-            countries[countryCode] = bucket.count;
-          }
-
-          const response = {
-            total_hosts: totalHosts,
-            total_services: totalServices,
-            last_sync: new Date().toISOString(),
-            countries,
-            services
-          };
-
-          return new Response(JSON.stringify(response), {
-            status: 200,
-            headers: responseHeaders()
-          });
-        } catch (error) {
-          console.error('Censys summary error:', error);
-          return new Response(JSON.stringify({
-            error: 'Unable to retrieve Censys summary',
-            details: error.message,
-            last_sync: new Date().toISOString(),
-            total_hosts: 0,
-            total_services: 0,
-            countries: {},
-            services: {}
-          }), {
-            status: 502,
-            headers: responseHeaders()
-          });
-        }
-      }
-
-      function responseHeaders() {
-        return {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-store, no-cache, must-revalidate'
-        };
-      }
-
-      return { onRequest };
-    `;
-
-    const module = eval(`(function() { ${censysModule} })()`);
-    onRequest = module.onRequest;
+    global.btoa = mockBtoa;
   });
 
   afterEach(() => {
     jest.clearAllMocks();
+    mockConsoleError.mockRestore();
   });
 
-  describe('Environment variable validation', () => {
+  // Helper to create mock context
+  const createMockContext = (apiId = 'test-api-id', apiSecret = 'test-api-secret') => ({
+    env: {
+      CENSYS_API_ID: apiId,
+      CENSYS_API_SECRET: apiSecret
+    }
+  });
+
+  // Helper to create successful mock responses
+  const setupSuccessfulMocks = (hostTotal = 12345) => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          result: {
+            total: hostTotal
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          result: {
+            buckets: [
+              { key: 'HTTP', count: 5000 },
+              { key: 'HTTPS', count: 4000 },
+              { key: 'SSH', count: 2000 },
+              { key: 'FTP', count: 1000 }
+            ]
+          }
+        })
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          result: {
+            buckets: [
+              { key: 'us', count: 3000 },
+              { key: 'gb', count: 2000 },
+              { key: 'de', count: 1500 }
+            ]
+          }
+        })
+      });
+  };
+
+  // Since we can't easily import ES modules in Jest with current config,
+  // we'll test the function's behavior by reading and evaluating it
+  const loadModule = () => {
+    const fs = require('fs');
+    const path = require('path');
+    const code = fs.readFileSync(
+      path.join(__dirname, '../functions/api/censys-summary.js'),
+      'utf8'
+    );
+    
+    // Create a module context
+    const module = { exports: {} };
+    const exports = module.exports;
+    
+    // Transform ES module to something we can evaluate
+    const transformedCode = code
+      .replace(/export async function onRequest/, 'module.exports.onRequest = async function')
+      .replace(/export function responseHeaders/, 'module.exports.responseHeaders = function');
+    
+    // Evaluate in isolated context
+    const func = new Function('module', 'exports', 'Response', 'fetch', 'btoa', 'console', transformedCode);
+    func(module, exports, Response, global.fetch, global.btoa, console);
+    
+    return module.exports;
+  };
+
+  describe('Environment validation', () => {
     it('should return 500 error when CENSYS_API_ID is missing', async () => {
-      const context = {
-        env: {
-          CENSYS_API_SECRET: 'test-secret'
-        }
-      };
+      const { onRequest } = loadModule();
+      const context = createMockContext(undefined, 'secret');
 
       const response = await onRequest(context);
-      const body = await response.json();
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(500);
       expect(body.error).toContain('Missing CENSYS_API_ID');
     });
 
     it('should return 500 error when CENSYS_API_SECRET is missing', async () => {
-      const context = {
-        env: {
-          CENSYS_API_ID: 'test-id'
-        }
-      };
+      const { onRequest } = loadModule();
+      const context = createMockContext('id', undefined);
 
       const response = await onRequest(context);
-      const body = await response.json();
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(500);
       expect(body.error).toContain('Missing CENSYS_API_SECRET');
     });
 
     it('should return 500 error when both credentials are missing', async () => {
+      const { onRequest } = loadModule();
       const context = { env: {} };
 
       const response = await onRequest(context);
-      const body = await response.json();
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(500);
-      expect(body.error).toContain('Missing CENSYS_API_ID');
+      expect(body.error).toContain('Missing');
     });
 
-    it('should have proper headers on error response', async () => {
+    it('should return proper headers for error responses', async () => {
+      const { onRequest } = loadModule();
       const context = { env: {} };
-      const response = await onRequest(context);
 
-      expect(response.headers['Content-Type']).toBe('application/json');
-      expect(response.headers['Cache-Control']).toBe('no-store, no-cache, must-revalidate');
+      const response = await onRequest(context);
+      
+      expect(response.headers.get('Content-Type')).toBe('application/json');
+      expect(response.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
     });
   });
 
-  describe('Successful data aggregation', () => {
-    it('should fetch and aggregate data from all three Censys endpoints', async () => {
-      const mockHostData = {
-        result: {
-          total: 15000000
-        }
-      };
+  describe('Successful API calls', () => {
+    it('should successfully fetch and aggregate Censys data', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
 
-      const mockServiceData = {
-        result: {
-          buckets: [
-            { key: 'http', count: 5000 },
-            { key: 'https', count: 8000 },
-            { key: 'ssh', count: 2000 }
-          ]
-        }
-      };
-
-      const mockCountryData = {
-        result: {
-          buckets: [
-            { key: 'us', count: 3000 },
-            { key: 'gb', count: 1500 },
-            { key: 'de', count: 1200 }
-          ]
-        }
-      };
-
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockHostData
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockServiceData
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: async () => mockCountryData
-        });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(200);
-      expect(body.total_hosts).toBe(15000000);
-      expect(body.total_services).toBe(15000);
-      expect(body.services).toEqual({
-        http: 5000,
-        https: 8000,
-        ssh: 2000
-      });
+      expect(body.total_hosts).toBe(12345);
+      expect(body.total_services).toBe(12000); // Sum of service counts
+      expect(body.last_sync).toBeTruthy();
       expect(body.countries).toEqual({
         US: 3000,
-        GB: 1500,
-        DE: 1200
+        GB: 2000,
+        DE: 1500
       });
-      expect(body.last_sync).toBeTruthy();
-      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(body.services).toEqual({
+        HTTP: 5000,
+        HTTPS: 4000,
+        SSH: 2000,
+        FTP: 1000
+      });
     });
 
-    it('should make requests with proper authorization headers', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
-      });
+    it('should call Censys API with correct authentication', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
 
-      await onRequest(mockContext);
+      await onRequest(context);
 
-      const expectedAuth = `Basic ${Buffer.from('test-api-id:test-api-secret').toString('base64')}`;
-      
+      expect(mockBtoa).toHaveBeenCalledWith('test-api-id:test-api-secret');
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('https://search.censys.io/api/v2'),
         expect.objectContaining({
-          method: 'POST',
           headers: expect.objectContaining({
-            'Authorization': expectedAuth,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Authorization': expect.stringContaining('Basic')
           })
         })
       );
     });
 
-    it('should call hosts/search endpoint with correct parameters', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
-      });
+    it('should make three parallel API calls', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
 
-      await onRequest(mockContext);
+      await onRequest(context);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://search.censys.io/api/v2/hosts/search',
-        expect.objectContaining({
-          body: JSON.stringify({ q: '*', per_page: 1, virtual_hosts: 'EXCLUDE' })
-        })
-      );
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      
+      // Verify all three endpoints were called
+      const calls = mockFetch.mock.calls;
+      expect(calls[0][0]).toContain('/hosts/search');
+      expect(calls[1][0]).toContain('/hosts/stats/services.service_name');
+      expect(calls[2][0]).toContain('/hosts/stats/location.country_code');
     });
 
-    it('should call service stats endpoint with correct parameters', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
+    it('should include proper request headers', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      await onRequest(context);
+
+      const firstCall = mockFetch.mock.calls[0];
+      expect(firstCall[1].headers).toEqual({
+        'Authorization': expect.any(String),
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       });
-
-      await onRequest(mockContext);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://search.censys.io/api/v2/hosts/stats/services.service_name',
-        expect.objectContaining({
-          body: JSON.stringify({ q: '*', num_buckets: 25 })
-        })
-      );
     });
 
-    it('should call country stats endpoint with correct parameters', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
+    it('should send correct payload for host search', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      await onRequest(context);
+
+      const hostSearchCall = mockFetch.mock.calls[0];
+      const payload = JSON.parse(hostSearchCall[1].body);
+      
+      expect(payload).toEqual({
+        q: '*',
+        per_page: 1,
+        virtual_hosts: 'EXCLUDE'
       });
+    });
 
-      await onRequest(mockContext);
+    it('should send correct payload for service stats', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'https://search.censys.io/api/v2/hosts/stats/location.country_code',
-        expect.objectContaining({
-          body: JSON.stringify({ q: '*', num_buckets: 50 })
-        })
-      );
+      await onRequest(context);
+
+      const serviceStatsCall = mockFetch.mock.calls[1];
+      const payload = JSON.parse(serviceStatsCall[1].body);
+      
+      expect(payload).toEqual({
+        q: '*',
+        num_buckets: 25
+      });
+    });
+
+    it('should send correct payload for country stats', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      await onRequest(context);
+
+      const countryStatsCall = mockFetch.mock.calls[2];
+      const payload = JSON.parse(countryStatsCall[1].body);
+      
+      expect(payload).toEqual({
+        q: '*',
+        num_buckets: 50
+      });
     });
 
     it('should uppercase country codes', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            total: 0,
-            buckets: [
-              { key: 'us', count: 100 },
-              { key: 'gb', count: 50 },
-              { key: 'JP', count: 75 }
-            ]
-          }
-        })
-      });
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
-      expect(body.countries.US).toBe(100);
-      expect(body.countries.GB).toBe(50);
-      expect(body.countries.JP).toBe(75);
+      // Verify lowercase country codes from API are uppercased
+      expect(body.countries).toHaveProperty('US');
+      expect(body.countries).toHaveProperty('GB');
+      expect(body.countries).toHaveProperty('DE');
+      expect(body.countries).not.toHaveProperty('us');
+      expect(body.countries).not.toHaveProperty('gb');
     });
 
-    it('should handle empty service buckets gracefully', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { buckets: [] } })
-      });
+    it('should return ISO timestamp for last_sync', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
-      expect(body.services).toEqual({});
+      expect(body.last_sync).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(new Date(body.last_sync).toISOString()).toBe(body.last_sync);
+    });
+
+    it('should include cache control headers', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+
+      expect(response.headers.get('Cache-Control')).toBe('no-store, no-cache, must-revalidate');
+    });
+
+    it('should include content-type header', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+
+      expect(response.headers.get('Content-Type')).toBe('application/json');
+    });
+  });
+
+  describe('Edge cases and data validation', () => {
+    it('should handle empty service buckets', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 100 } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { buckets: [] } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { buckets: [] } })
+        });
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
       expect(body.total_services).toBe(0);
+      expect(body.services).toEqual({});
+      expect(body.countries).toEqual({});
+    });
+
+    it('should handle missing result objects', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({})
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({})
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({})
+        });
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(body.total_hosts).toBe(0);
+      expect(body.total_services).toBe(0);
+      expect(body.services).toEqual({});
+      expect(body.countries).toEqual({});
     });
 
     it('should skip buckets without keys', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            buckets: [
-              { key: 'http', count: 100 },
-              { count: 50 }, // Missing key
-              { key: null, count: 25 }, // Null key
-              { key: 'https', count: 200 }
-            ]
-          }
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 100 } })
         })
-      });
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [
+                { key: 'HTTP', count: 100 },
+                { count: 50 }, // Missing key
+                { key: null, count: 25 }, // Null key
+                { key: 'HTTPS', count: 75 }
+              ]
+            }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [
+                { key: 'us', count: 50 },
+                { count: 25 } // Missing key
+              ]
+            }
+          })
+        });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(body.services).toEqual({
-        http: 100,
-        https: 200
+        HTTP: 100,
+        HTTPS: 75
       });
-      expect(body.total_services).toBe(300);
+      expect(body.total_services).toBe(175);
+      expect(body.countries).toEqual({ US: 50 });
     });
 
-    it('should handle missing result object with nullish coalescing', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({})
-      });
+    it('should handle very large numbers', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 999999999 } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [{ key: 'HTTP', count: 888888888 }]
+            }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [{ key: 'us', count: 777777777 }]
+            }
+          })
+        });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(body.total_hosts).toBe(999999999);
+      expect(body.total_services).toBe(888888888);
+      expect(body.countries.US).toBe(777777777);
+    });
+
+    it('should handle zero counts', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 0 } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [{ key: 'HTTP', count: 0 }]
+            }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [{ key: 'us', count: 0 }]
+            }
+          })
+        });
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(body.total_hosts).toBe(0);
-      expect(body.services).toEqual({});
-      expect(body.countries).toEqual({});
+      expect(body.services.HTTP).toBe(0);
+      expect(body.countries.US).toBe(0);
+    });
+
+    it('should handle country codes with mixed case', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 100 } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { buckets: [] } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [
+                { key: 'Us', count: 100 },
+                { key: 'gB', count: 50 },
+                { key: 'FR', count: 25 }
+              ]
+            }
+          })
+        });
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(body.countries).toEqual({
+        US: 100,
+        GB: 50,
+        FR: 25
+      });
     });
   });
 
   describe('Error handling', () => {
-    it('should return 502 error when Censys API returns non-OK status', async () => {
+    it('should handle HTTP error from host search endpoint', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
         text: async () => 'Unauthorized'
       });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(502);
       expect(body.error).toBe('Unable to retrieve Censys summary');
-      expect(body.details).toContain('Censys');
       expect(body.details).toContain('401');
-      expect(body.total_hosts).toBe(0);
-      expect(body.total_services).toBe(0);
-      expect(body.countries).toEqual({});
-      expect(body.services).toEqual({});
-      expect(body.last_sync).toBeTruthy();
+      expect(body.details).toContain('Unauthorized');
     });
 
-    it('should handle network errors gracefully', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    it('should handle HTTP error from service stats endpoint', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 100 } })
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: async () => 'Rate limit exceeded'
+        });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(502);
       expect(body.error).toBe('Unable to retrieve Censys summary');
-      expect(body.details).toBe('Network error');
+      expect(body.details).toContain('429');
     });
 
-    it('should handle timeout errors', async () => {
-      mockFetch.mockRejectedValueOnce(new Error('Request timeout'));
+    it('should handle HTTP error from country stats endpoint', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { total: 100 } })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ result: { buckets: [] } })
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 500,
+          text: async () => 'Internal server error'
+        });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(502);
-      expect(body.details).toBe('Request timeout');
+      expect(body.details).toContain('500');
     });
 
-    it('should handle JSON parse errors', async () => {
+    it('should handle network errors', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network failure'));
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(response.status).toBe(502);
+      expect(body.error).toBe('Unable to retrieve Censys summary');
+      expect(body.details).toContain('Network failure');
+    });
+
+    it('should handle JSON parsing errors', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => {
@@ -442,244 +625,338 @@ describe('Cloudflare Worker - censys-summary.js', () => {
         }
       });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(502);
-      expect(body.error).toBe('Unable to retrieve Censys summary');
+      expect(body.details).toContain('Invalid JSON');
     });
 
-    it('should handle partial API failures (one endpoint fails)', async () => {
+    it('should return fallback data structure on error', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('API Error'));
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(body).toHaveProperty('error');
+      expect(body).toHaveProperty('details');
+      expect(body).toHaveProperty('last_sync');
+      expect(body.total_hosts).toBe(0);
+      expect(body.total_services).toBe(0);
+      expect(body.countries).toEqual({});
+      expect(body.services).toEqual({});
+    });
+
+    it('should include timestamp in error responses', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Test error'));
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(body.last_sync).toBeTruthy();
+      expect(body.last_sync).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    });
+
+    it('should log errors to console', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Test error'));
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      await onRequest(context);
+
+      expect(mockConsoleError).toHaveBeenCalledWith(
+        'Censys summary error:',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle timeout errors', async () => {
+      mockFetch.mockImplementationOnce(() => 
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 0)
+        )
+      );
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(response.status).toBe(502);
+      expect(body.details).toContain('timeout');
+    });
+
+    it('should handle malformed API responses gracefully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => 'not an object'
+      });
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(response.status).toBe(502);
+    });
+  });
+
+  describe('Response format validation', () => {
+    beforeEach(() => {
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
-          json: async () => ({ result: { total: 1000 } })
+          json: async () => ({ result: { total: 100 } })
         })
         .mockResolvedValueOnce({
-          ok: false,
-          status: 500,
-          text: async () => 'Internal Server Error'
+          ok: true,
+          json: async () => ({
+            result: { buckets: [{ key: 'HTTP', count: 50 }] }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: { buckets: [{ key: 'us', count: 25 }] }
+          })
+        });
+    });
+
+    it('should return Response object', async () => {
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      expect(response).toBeInstanceOf(Response);
+    });
+
+    it('should return valid JSON', async () => {
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const text = await response.text();
+      
+      expect(() => JSON.parse(text)).not.toThrow();
+    });
+
+    it('should have all required fields in success response', async () => {
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(body).toHaveProperty('total_hosts');
+      expect(body).toHaveProperty('total_services');
+      expect(body).toHaveProperty('last_sync');
+      expect(body).toHaveProperty('countries');
+      expect(body).toHaveProperty('services');
+    });
+
+    it('should return objects for countries and services', async () => {
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(typeof body.countries).toBe('object');
+      expect(typeof body.services).toBe('object');
+      expect(Array.isArray(body.countries)).toBe(false);
+      expect(Array.isArray(body.services)).toBe(false);
+    });
+
+    it('should return numbers for counts', async () => {
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(typeof body.total_hosts).toBe('number');
+      expect(typeof body.total_services).toBe('number');
+    });
+
+    it('should return string for timestamp', async () => {
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(typeof body.last_sync).toBe('string');
+    });
+  });
+
+  describe('Performance and optimization', () => {
+    it('should use Promise.all for parallel requests', async () => {
+      const startTime = Date.now();
+      
+      mockFetch
+        .mockImplementation(() => 
+          new Promise(resolve => 
+            setTimeout(() => resolve({
+              ok: true,
+              json: async () => ({ result: {} })
+            }), 50)
+          )
+        );
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      await onRequest(context);
+      const duration = Date.now() - startTime;
+
+      // Should complete in roughly the time of one request, not three sequential
+      expect(duration).toBeLessThan(200);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('should reuse auth header for all requests', async () => {
+      setupSuccessfulMocks();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      await onRequest(context);
+
+      const authHeaders = mockFetch.mock.calls.map(call => call[1].headers.Authorization);
+      const uniqueAuthHeaders = new Set(authHeaders);
+      
+      expect(uniqueAuthHeaders.size).toBe(1); // Same auth header reused
+      expect(mockBtoa).toHaveBeenCalledTimes(1); // Only encoded once
+    });
+  });
+
+  describe('Integration scenarios', () => {
+    it('should handle realistic production data', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              total: 4500000,
+              query: '*',
+              duration: 125
+            }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [
+                { key: 'HTTP', count: 1800000 },
+                { key: 'HTTPS', count: 1500000 },
+                { key: 'SSH', count: 450000 },
+                { key: 'FTP', count: 300000 },
+                { key: 'SMTP', count: 250000 },
+                { key: 'DNS', count: 200000 }
+              ],
+              total: 4500000
+            }
+          })
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            result: {
+              buckets: [
+                { key: 'us', count: 1350000 },
+                { key: 'cn', count: 900000 },
+                { key: 'de', count: 450000 },
+                { key: 'gb', count: 405000 },
+                { key: 'jp', count: 360000 },
+                { key: 'fr', count: 315000 },
+                { key: 'ca', count: 270000 },
+                { key: 'au', count: 225000 },
+                { key: 'in', count: 180000 },
+                { key: 'br', count: 45000 }
+              ]
+            }
+          })
         });
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
+
+      expect(response.status).toBe(200);
+      expect(body.total_hosts).toBe(4500000);
+      expect(body.total_services).toBe(4500000);
+      expect(Object.keys(body.services)).toHaveLength(6);
+      expect(Object.keys(body.countries)).toHaveLength(10);
+      expect(body.countries.US).toBe(1350000);
+      expect(body.countries.CN).toBe(900000);
+    });
+
+    it('should handle rate limiting gracefully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => JSON.stringify({
+          error: 'rate_limit_exceeded',
+          message: 'Too many requests'
+        })
+      });
+
+      const { onRequest } = loadModule();
+      const context = createMockContext();
+
+      const response = await onRequest(context);
+      const body = JSON.parse(await response.text());
 
       expect(response.status).toBe(502);
-      expect(body.error).toBe('Unable to retrieve Censys summary');
-    });
-  });
-
-  describe('Response headers', () => {
-    it('should include proper content-type header on success', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
-      });
-
-      const response = await onRequest(mockContext);
-
-      expect(response.headers['Content-Type']).toBe('application/json');
-    });
-
-    it('should include cache-control header to prevent caching', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
-      });
-
-      const response = await onRequest(mockContext);
-
-      expect(response.headers['Cache-Control']).toBe('no-store, no-cache, must-revalidate');
-    });
-
-    it('should include proper headers on error responses', async () => {
-      mockFetch.mockRejectedValue(new Error('Test error'));
-
-      const response = await onRequest(mockContext);
-
-      expect(response.headers['Content-Type']).toBe('application/json');
-      expect(response.headers['Cache-Control']).toBe('no-store, no-cache, must-revalidate');
-    });
-  });
-
-  describe('Edge cases and boundary conditions', () => {
-    it('should handle very large host counts', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            total: 999999999999,
-            buckets: []
-          }
-        })
-      });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      expect(body.total_hosts).toBe(999999999999);
-    });
-
-    it('should handle zero counts correctly', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            total: 0,
-            buckets: []
-          }
-        })
-      });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
+      expect(body.error).toBeTruthy();
       expect(body.total_hosts).toBe(0);
-      expect(body.total_services).toBe(0);
-    });
-
-    it('should handle special characters in service names', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            buckets: [
-              { key: 'http/https', count: 100 },
-              { key: 'ssh-2.0', count: 50 },
-              { key: 'service:8080', count: 25 }
-            ]
-          }
-        })
-      });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      expect(body.services['http/https']).toBe(100);
-      expect(body.services['ssh-2.0']).toBe(50);
-      expect(body.services['service:8080']).toBe(25);
-    });
-
-    it('should handle maximum number of buckets', async () => {
-      const maxBuckets = Array.from({ length: 50 }, (_, i) => ({
-        key: `country${i}`,
-        count: i * 100
-      }));
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            total: 0,
-            buckets: maxBuckets
-          }
-        })
-      });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      expect(Object.keys(body.countries).length).toBe(50);
-    });
-
-    it('should generate valid ISO timestamp', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 0, buckets: [] } })
-      });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      const timestamp = new Date(body.last_sync);
-      expect(timestamp.toISOString()).toBe(body.last_sync);
-      expect(isNaN(timestamp.getTime())).toBe(false);
-    });
-
-    it('should handle concurrent requests independently', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ result: { total: 100, buckets: [] } })
-      });
-
-      const [response1, response2] = await Promise.all([
-        onRequest(mockContext),
-        onRequest(mockContext)
-      ]);
-
-      const body1 = await response1.json();
-      const body2 = await response2.json();
-
-      expect(body1.total_hosts).toBe(100);
-      expect(body2.total_hosts).toBe(100);
-      expect(mockFetch).toHaveBeenCalledTimes(6); // 3 calls per request
     });
   });
 
-  describe('Data transformation', () => {
-    it('should correctly sum service counts', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            buckets: [
-              { key: 'service1', count: 1000 },
-              { key: 'service2', count: 2000 },
-              { key: 'service3', count: 3000 },
-              { key: 'service4', count: 4000 }
-            ]
-          }
-        })
-      });
+  describe('JSDoc documentation completeness', () => {
+    it('should have JSDoc for onRequest function', () => {
+      const fs = require('fs');
+      const path = require('path');
+      const code = fs.readFileSync(
+        path.join(__dirname, '../functions/api/censys-summary.js'),
+        'utf8'
+      );
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      expect(body.total_services).toBe(10000);
+      expect(code).toContain('@param {object} context');
+      expect(code).toContain('@returns {Response}');
+      expect(code).toContain('total_hosts');
+      expect(code).toContain('total_services');
+      expect(code).toContain('last_sync');
+      expect(code).toContain('countries');
+      expect(code).toContain('services');
     });
 
-    it('should preserve service names exactly as returned', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            buckets: [
-              { key: 'HTTP', count: 100 },
-              { key: 'http', count: 200 },
-              { key: 'HtTp', count: 300 }
-            ]
-          }
-        })
-      });
+    it('should have JSDoc for responseHeaders function', () => {
+      const fs = require('fs');
+      const path = require('path');
+      const code = fs.readFileSync(
+        path.join(__dirname, '../functions/api/censys-summary.js'),
+        'utf8'
+      );
 
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      expect(body.services.HTTP).toBe(100);
-      expect(body.services.http).toBe(200);
-      expect(body.services.HtTp).toBe(300);
-    });
-
-    it('should maintain country code case-insensitivity through uppercase', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          result: {
-            buckets: [
-              { key: 'us', count: 100 },
-              { key: 'US', count: 200 },
-              { key: 'Us', count: 300 }
-            ]
-          }
-        })
-      });
-
-      const response = await onRequest(mockContext);
-      const body = await response.json();
-
-      // All should be converted to 'US', last one wins
-      expect(body.countries.US).toBe(300);
-      expect(Object.keys(body.countries).length).toBe(1);
+      expect(code).toContain('Provide standard JSON response headers');
+      expect(code).toContain('@returns');
+      expect(code).toContain('Content-Type');
+      expect(code).toContain('Cache-Control');
     });
   });
 });

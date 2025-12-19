@@ -41,6 +41,23 @@ Documentation validation tests focusing on:
 - Link integrity
 - Markdown formatting
 
+### `censys-summary.test.js`
+Comprehensive unit tests for `functions/api/censys-summary.js` Cloudflare Pages Function focusing on:
+- **Environment validation** - Missing API credentials handling (CENSYS_API_ID, CENSYS_API_SECRET)
+- **Successful API calls** - Correct data fetching, authentication, and aggregation from Censys API
+- **Parallel request handling** - Verifies Promise.all usage for host, service, and country stats
+- **Data aggregation** - Service count totals, country code uppercasing, bucket processing
+- **Edge cases** - Empty buckets, missing result objects, null keys, very large numbers, zero counts, mixed-case country codes
+- **Error handling** - HTTP errors (401, 429, 500, 502), network failures, JSON parsing errors, timeout errors, malformed responses
+- **Response format validation** - Valid JSON structure, correct data types (numbers, objects, strings), required fields
+- **Header validation** - Content-Type and Cache-Control headers for both success and error responses
+- **Performance optimization** - Auth header reuse, parallel API calls timing
+- **Integration scenarios** - Realistic production data volumes, rate limiting behavior
+- **JSDoc completeness** - Validation of function documentation
+
+### `integration.test.js`
+Integration tests for component interactions and user workflows
+
 ## Running Tests
 
 ```bash
@@ -49,6 +66,9 @@ npm install
 
 # Run all tests
 npm test
+
+# Run specific test file
+npm test censys-summary.test.js
 
 # Run tests in watch mode
 npm run test:watch
@@ -61,6 +81,7 @@ npm run test:coverage
 
 The test suite provides comprehensive coverage for:
 - All modified functions in the current branch
+- Backend API functions (Cloudflare Pages Functions)
 - Edge cases and error conditions
 - Accessibility requirements
 - Cross-file consistency
@@ -70,4 +91,4 @@ The test suite provides comprehensive coverage for:
 
 - **Jest**: Test runner and assertion library
 - **jsdom**: DOM implementation for Node.js
-- Built-in mocks for localStorage, matchMedia, and console
+- Built-in mocks for localStorage, matchMedia, console, fetch, and btoa
