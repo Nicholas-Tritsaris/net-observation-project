@@ -1,3 +1,18 @@
+/**
+ * Handle an HTTP request and return a consolidated summary of Censys host, service, and country statistics.
+ *
+ * @param {object} context - Execution context containing environment variables and runtime helpers.
+ * @param {object} context.env - Environment variables.
+ * @param {string} context.env.CENSYS_API_ID - Censys API ID used for Basic authentication.
+ * @param {string} context.env.CENSYS_API_SECRET - Censys API secret used for Basic authentication.
+ * @returns {Response} A Response whose JSON body on success contains:
+ *   - total_hosts: total number of hosts,
+ *   - total_services: summed count of reported services,
+ *   - last_sync: ISO timestamp of the query,
+ *   - countries: map of uppercased country codes to counts,
+ *   - services: map of service names to counts.
+ *   On error the response contains an error message, details, last_sync, and zero/empty metrics, with an appropriate HTTP status.
+ */
 export async function onRequest(context) {
   const { env } = context;
   const id = env.CENSYS_API_ID;
@@ -87,6 +102,10 @@ export async function onRequest(context) {
   }
 }
 
+/**
+ * Return standard HTTP headers for JSON responses with no-cache directives.
+ * @returns {{'Content-Type': string, 'Cache-Control': string}} An object containing headers: `Content-Type` set to `application/json` and `Cache-Control` set to `no-store, no-cache, must-revalidate`.
+ */
 function responseHeaders() {
   return {
     'Content-Type': 'application/json',
