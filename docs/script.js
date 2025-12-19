@@ -19,11 +19,11 @@
     : { matches: true };
 
   /**
-   * Load persisted settings from localStorage and merge them into AppState.settings.
+   * Load persisted settings from localStorage into the in-memory AppState.settings.
    *
-   * If a stored settings object exists under STORAGE_KEY, its properties are shallow-merged
-   * into the existing AppState.settings. On JSON parse or storage access errors a warning
-   * is logged and AppState.settings is left unchanged.
+   * If a JSON object is stored under STORAGE_KEY, its properties are shallow-merged
+   * into AppState.settings. On JSON parse or storage access errors, a warning is
+   * logged and AppState.settings is not modified.
    */
   function loadSettings() {
     try {
@@ -62,11 +62,12 @@
   }
 
   /**
-   * Replaces missing or failed logo images with a text placeholder element.
+   * Replace missing or failed logo images with non-interactive text placeholders.
    *
    * For each <img data-logo> element, if the image fails to load or has no intrinsic size,
-   * the function hides the image, marks it to avoid repeated fallbacks, and inserts a
-   * non-interactive placeholder showing the image's alt text (or "Net Observation") in uppercase.
+   * the image is hidden, a per-image fallback flag is set to avoid repeated replacements,
+   * and a nearby placeholder element is inserted showing the image's alt text (or "NET OBSERVATION")
+   * in uppercase. The placeholder is marked aria-hidden.
    */
   function initLogoPlaceholders() {
     const createFallback = (img) => {
@@ -98,10 +99,10 @@
   /**
    * Initialize the theme toggle control and wire user and system preference handlers.
    *
-   * Sets up the element [data-role="theme-toggle"] (if present) to cycle the theme through
-   * "auto", "dark", and "light" on click or Enter/Space key, persists the choice to settings,
-   * applies the resolved theme, and updates the visible label at [data-label]. Also listens
-   * for system color-scheme changes and reapplies the theme when the current setting is "auto".
+   * Sets up the element matching [data-role="theme-toggle"] (if present) to cycle the site theme
+   * through "auto", "dark", and "light" when activated, persists the chosen setting, applies the
+   * resolved theme, and updates the visible label at [data-label]. Also listens for system
+   * color-scheme changes and reapplies the theme when the current setting is "auto".
    */
   function initThemeToggle() {
     const toggle = document.querySelector('[data-role="theme-toggle"]');
@@ -178,9 +179,9 @@
   }
 
   /**
-   * Selects the first DOM element matching the given CSS selector.
-   * @param {string} id - CSS selector of the element to find.
-   * @returns {Element|null} The first matching Element, or `null` if no match is found.
+   * Return the first DOM element that matches the provided CSS selector.
+   * @param {string} id - CSS selector string to match against the document.
+   * @returns {Element|null} The first matching Element, or `null` if no element matches.
    */
   function qs(id) {
     return document.querySelector(id);
@@ -212,14 +213,15 @@
   }
 
   /**
-   * Populate a table body with rows created from an object's entries, sorted by value descending.
+   * Populate a table's tbody with rows from an object's entries sorted by value descending.
    *
-   * Clears the table's tbody and appends one row per entry using the object key as the first cell
-   * and the object's value formatted with locale separators as the second cell. If the selector
-   * doesn't match an element, the element has no tbody, or objectData is falsy, the function does nothing.
+   * Clears the target tbody and appends one <tr> per entry where the first <td> is the object key
+   * and the second <td> is the numeric value formatted with Number(...).toLocaleString().
+   * No changes are made if the selector does not match an element, the element has no tbody,
+   * or if `objectData` is falsy.
    *
    * @param {string} selector - CSS selector for a table element that contains a <tbody>.
-   * @param {Object<string, number>} objectData - Mapping of label -> numeric value to render; values are sorted descending and formatted with toLocaleString().
+   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; values are sorted descending and formatted with locale separators.
    */
   function renderTable(selector, objectData) {
     const container = qs(selector);
@@ -265,9 +267,9 @@
   }
 
   /**
-   * Initialize automatic periodic fetching of the Censys summary.
+   * Start automatic refresh of the Censys summary.
    *
-   * Performs an immediate fetch of the summary and schedules subsequent silent fetches every 60 seconds.
+   * Performs an immediate fetch and schedules silent refreshes every 60 seconds.
    */
   function initAutoRefresh() {
     fetchCensysSummary();
@@ -329,12 +331,12 @@
   }
 
   /**
-   * Update Chart.js service and country charts from the provided summary data.
+   * Update the Chart.js service and country charts to reflect the provided summary data.
    *
-   * Updates the services chart with all services sorted by count descending,
-   * and updates the countries chart with the top 12 countries by count.
-   * Replaces labels, dataset values, and dataset background colors, then refreshes the charts.
-   * @param {Object} data - Summary data with optional shape `{ services: { [serviceName]: number }, countries: { [countryName]: number } }`.
+   * Services are sorted by count (descending) and fully applied to the services chart.
+   * Countries are sorted by count (descending) and the top 12 are applied to the countries chart.
+   * Labels, dataset values, and dataset background colors are replaced and charts are refreshed.
+   * @param {Object} data - Summary data with optional properties `services` and `countries`, each a mapping of name to count (e.g., `{ services: { http: 10 }, countries: { US: 5 } }`).
    */
   function updateCharts(data) {
     if (!data) return;
@@ -358,10 +360,10 @@
   }
 
   /**
-   * Create a list of visually distinct CSS HSL color strings for charting or UI elements.
+   * Generate an array of visually distinct HSL CSS color strings for charts or UI elements.
    * @param {number} count - Number of colors to generate.
-   * @param {string} seed - Seed that influences the base hue; when `'services'` the base hue is centered differently.
-   * @returns {string[]} An array of CSS color strings in HSL format with alpha (e.g. `"hsl(... / 0.7)"`).
+   * @param {string} seed - Influences the base hue; when `'services'`, a different base hue is used.
+   * @returns {string[]} An array of HSL CSS color strings with alpha (e.g. "hsl(... 80% 55% / 0.7)").
    */
   function generateColorPalette(count, seed) {
     const baseHue = seed === 'services' ? 180 : 300;
@@ -547,13 +549,9 @@
   };
 
   /**
-   * Initialize and wire the settings panel UI and its controls.
+   * Wire the settings panel UI: populate fields from persisted settings, handle form submission to save changes, and toggle panel visibility.
    *
-   * Populates form fields from AppState.settings, handles form submission to persist updated settings,
-   * applies the selected theme, re-initializes Auth0, and logs the save action. Also wires the panel
-   * toggle control to show/hide the settings panel.
-   *
-   * If the settings panel or its toggle control are not present in the DOM, the function does nothing.
+   * Populates form controls from AppState.settings, persists updated settings on submit, applies the selected theme, re-initializes Auth0, and logs the save action to the in-page terminal. If the panel or its toggle control are not present, the function is a no-op.
    */
   function initSettingsPanel() {
     const panel = document.querySelector('.settings-panel');
@@ -590,11 +588,12 @@
   }
 
   /**
-   * Initialize the Auth0 client when the Auth0 library and configuration are available.
+   * Initialize and configure the Auth0 client when the Auth0 library and settings are available.
    *
-   * If the global Auth0 factory and the configured domain and clientId are present,
-   * creates an Auth0 client, stores it on `AppState.auth0Client`, updates authentication
-   * UI controls, and logs success or failure messages to the terminal.
+   * If the Auth0 factory and configured domain and clientId are present, creates an Auth0 client,
+   * assigns it to AppState.auth0Client, updates authentication UI controls via updateAuthControls,
+   * and logs success or failure messages to the in-page terminal. Does nothing if the factory or
+   * configuration is missing; errors are caught and logged rather than thrown.
    */
   async function initAuth0() {
     if (!window.createAuth0Client) return;
@@ -617,14 +616,13 @@
   }
 
   /**
-   * Update authentication UI controls based on the current Auth0 client and sign-in state.
+   * Update authentication UI controls to reflect the current Auth0 client and sign-in state.
    *
-   * Sets the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
-   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and binds click
+   * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
+   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and attaches click
    * handlers that perform Auth0 login (popup) and logout (returning to the current page).
    *
-   * If no Auth0 client is available, both buttons are hidden and the status is set to "Anonymous".
-   * Click handlers are bound only once per button (marked via a data-bound flag).
+   * Click handlers are attached at most once per button.
    */
   async function updateAuthControls() {
     const loginBtn = document.querySelector('[data-action="login"]');
@@ -724,11 +722,11 @@
   }
 
   /**
-   * Enable smooth-scrolling for in-page anchor links within the docs sidebar.
+   * Enable smooth scrolling for in-page anchor links in the docs sidebar.
    *
-   * Attaches click handlers to anchors inside `.docs-sidebar` that reference fragment identifiers.
-   * For links whose `href` begins with `#`, the handler prevents the default navigation and
-   * scrolls the target element into view with smooth behavior and start alignment.
+   * Attaches click handlers to anchors inside `.docs-sidebar` that reference fragment
+   * identifiers; when a link's `href` begins with `#` the handler prevents default
+   * navigation and scrolls the target element into view with smooth behavior and start alignment.
    */
   function initDocsSidebar() {
     const tocLinks = document.querySelectorAll('.docs-sidebar a');
@@ -824,12 +822,12 @@
   }
 
   /**
-   * Bootstraps the application's UI, services, and plugins on page load.
+   * Bootstrap the application's UI, services, and plugins on page load.
    *
-   * Performs the startup sequence: loads persisted settings, applies the resolved theme,
-   * wires theme toggle and sidebar controls, initializes logo placeholders and the settings panel,
-   * initializes Auth0 and updates authentication controls, marks the active navigation link,
-   * initializes page-specific features, and registers a default "echo-plugin".
+   * Loads persisted settings, applies the resolved theme, initializes UI components
+   * (theme toggle, sidebar, logo placeholders, settings panel), sets up authentication
+   * controls, marks the active navigation link, initializes page-specific features,
+   * and registers a default "echo-plugin".
    */
   function init() {
     loadSettings();
