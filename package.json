@@ -1,11 +1,14 @@
 {
   "name": "net-observation-project",
-  "version": "2.3.0",
-  "description": "Cyber-neon observability suite",
+  "version": "1.0.0",
+  "description": "Cyber-neon observability suite test infrastructure",
   "scripts": {
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:html": "node tests/html-validator.js",
+    "test:css": "node tests/css-validator.js",
+    "test:all": "npm test && npm run test:html && npm run test:css"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
@@ -14,13 +17,18 @@
   },
   "jest": {
     "testEnvironment": "jsdom",
-    "testMatch": ["**/__tests__/**/*.test.js", "**/?(*.)+(spec|test).js"],
     "collectCoverageFrom": [
-      "docs/script.js"
+      "docs/script.js",
+      "functions/**/*.js"
     ],
     "coveragePathIgnorePatterns": [
       "/node_modules/"
     ],
-    "setupFilesAfterEnv": ["<rootDir>/test-setup.js"]
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/tests/setup.js"
+    ]
   }
 }

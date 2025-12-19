@@ -1,6 +1,3 @@
-// Jest setup file for DOM testing
-require('@testing-library/jest-dom');
-
 // Mock localStorage
 const localStorageMock = {
   getItem: jest.fn(),
@@ -10,11 +7,11 @@ const localStorageMock = {
 };
 global.localStorage = localStorageMock;
 
-// Mock matchMedia
+// Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: jest.fn().mockImplementation(query => ({
-    matches: query === '(prefers-color-scheme: dark)',
+    matches: false,
     media: query,
     onchange: null,
     addListener: jest.fn(),
