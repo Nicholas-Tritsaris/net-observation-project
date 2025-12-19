@@ -21,7 +21,13 @@ wrangler.toml.local
 # Generated assets
 *.tmp
 
-# Testing
-node_modules/
+# Test coverage
 coverage/
+.nyc_output/
+
+# Test artifacts
 *.log
+
+# IDE
+.vscode/
+.idea/
