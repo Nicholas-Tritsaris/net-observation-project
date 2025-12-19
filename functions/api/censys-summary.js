@@ -99,8 +99,8 @@ export async function onRequest(context) {
 }
 
 /**
- * Provide standard JSON response headers with caching disabled.
- * @returns {{ 'Content-Type': string, 'Cache-Control': string }} An object containing headers: 'Content-Type' set to 'application/json' and 'Cache-Control' set to 'no-store, no-cache, must-revalidate'.
+ * Return standard JSON response headers with caching disabled.
+ * @returns {{'Content-Type': string, 'Cache-Control': string}} Headers object with `Content-Type` set to "application/json" and `Cache-Control` set to "no-store, no-cache, must-revalidate".
  */
 function responseHeaders() {
   return {

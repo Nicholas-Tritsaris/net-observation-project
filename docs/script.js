@@ -98,10 +98,10 @@
   /**
    * Initialize the theme toggle control and wire user and system preference handlers.
    *
-   * Sets up the element [data-role="theme-toggle"] (if present) to cycle the theme through
-   * "auto", "dark", and "light" on click or Enter/Space key, persists the choice to settings,
-   * applies the resolved theme, and updates the visible label at [data-label]. Also listens
-   * for system color-scheme changes and reapplies the theme when the current setting is "auto".
+   * Wires the element [data-role="theme-toggle"] (if present) to cycle the theme through
+   * "auto", "dark", and "light" on click or Enter/Space, persists the chosen setting,
+   * applies the resolved theme, updates the visible label at [data-label], and listens
+   * for system color-scheme changes to reapply the theme when the current setting is "auto".
    */
   function initThemeToggle() {
     const toggle = document.querySelector('[data-role="theme-toggle"]');
@@ -212,14 +212,15 @@
   }
 
   /**
-   * Populate a table body with rows created from an object's entries, sorted by value descending.
+   * Populate a table body from an object's entries, sorted by value descending.
    *
-   * Clears the table's tbody and appends one row per entry using the object key as the first cell
-   * and the object's value formatted with locale separators as the second cell. If the selector
-   * doesn't match an element, the element has no tbody, or objectData is falsy, the function does nothing.
+   * Finds the table matching the provided selector and replaces its <tbody> contents with one row
+   * per entry: the object key in the first cell and the numeric value formatted with toLocaleString()
+   * in the second cell. If the selector does not match, the table has no <tbody>, or objectData is
+   * falsy, the function makes no changes.
    *
-   * @param {string} selector - CSS selector for a table element that contains a <tbody>.
-   * @param {Object<string, number>} objectData - Mapping of label -> numeric value to render; values are sorted descending and formatted with toLocaleString().
+   * @param {string} selector - CSS selector for the target table element that contains a <tbody>.
+   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; entries are sorted by value descending.
    */
   function renderTable(selector, objectData) {
     const container = qs(selector);
@@ -458,11 +459,10 @@
   }
 
   /**
-   * Initialize the data visualizer UI to parse and display JSON or CSV input.
+   * Initialize the data visualizer UI and wire input controls to parse and display JSON or CSV.
    *
-   * Wires the text input, file input, and render button so provided text or uploaded files
-   * are parsed as JSON (if the text starts with `{` or `[`) or as CSV otherwise, then
-   * rendered into the output area and logged to the in-page terminal.
+   * Parses provided text or uploaded files as JSON when the content starts with `{` or `[`; otherwise parses as CSV.
+   * Renders the parsed value as pretty-printed JSON into the visualizer output area and logs success or error to the in-page terminal.
    */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
@@ -664,11 +664,12 @@
   /**
    * Render a world choropleth heatmap into the element with id "worldHeatmap".
    *
-   * Renders country fill colors based on per-country numeric counts and caches loaded world topology for subsequent calls.
-   * Requires D3 and TopoJSON to be available on window; if the world topology has not been loaded it will be fetched and stored on AppState.worldData.
+   * Renders country fill colors from the provided per-country numeric counts and caches the loaded world topology on AppState.worldData for reuse.
+   *
+   * Requires D3 (window.d3) and TopoJSON (window.topojson). If either is missing or world topology cannot be loaded, the function exits without modifying the DOM.
    *
    * @param {Object} data - Data used to color the map.
-   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
+   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts; values are used to scale country colors. The map shows a tooltip with the country name and its corresponding count.
    */
   async function renderHeatmap(data) {
     const container = document.getElementById('worldHeatmap');
