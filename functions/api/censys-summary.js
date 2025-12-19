@@ -1,14 +1,8 @@
 /**
- * Handle an HTTP request that fetches and aggregates Censys host, service, and country statistics, then returns a JSON summary.
+ * Handle an HTTP request that fetches and aggregates Censys host, service, and country statistics and returns a JSON summary.
  *
- * @param {object} context - Request context object containing environment variables under `env` (expects `CENSYS_API_ID` and `CENSYS_API_SECRET`).
- * @returns {Response} An HTTP Response whose JSON body on success contains:
- *   - `total_hosts` (number): total host count,
- *   - `total_services` (number): aggregated service counts,
- *   - `last_sync` (string): ISO timestamp of the response,
- *   - `countries` (object): map of uppercased country codes to counts,
- *   - `services` (object): map of service names to counts.
- *   On failure the JSON body contains an `error` message, `details` with error information, `last_sync`, and empty/fallback totals and maps. */
+ * @param {object} context - Request context containing environment variables under `env` (expects `CENSYS_API_ID` and `CENSYS_API_SECRET`).
+ * @returns {Response} HTTP response whose JSON body on success contains `total_hosts` (number), `total_services` (number), `last_sync` (ISO timestamp string), `countries` (object mapping uppercased country codes to counts), and `services` (object mapping service names to counts); on failure the JSON body contains an `error` message, `details` with error information, `last_sync`, and fallback totals/maps. */
 export async function onRequest(context) {
   const { env } = context;
   const id = env.CENSYS_API_ID;
