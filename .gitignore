@@ -20,3 +20,18 @@ wrangler.toml.local
 
 # Generated assets
 *.tmp
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Test reports
+test-results/
+playwright-report/
+html-report/
+
+# Vitest
+.vitest/
+
+# Playwright
+playwright/.cache/
