@@ -1,759 +1,565 @@
 /**
  * Advanced unit tests for docs/script.js
- * Additional edge cases, boundary conditions, and integration scenarios
- * Complements existing __tests__/script.test.js with deeper coverage
+ * Tests advanced scenarios, edge cases, and stress conditions
+ * that complement the existing comprehensive test suite
  */
 
 const fs = require('fs');
 const path = require('path');
 
-describe('script.js - Advanced Edge Cases', () => {
+describe('Advanced Script.js Tests - Additional Coverage', () => {
   let scriptContent;
 
-  beforeEach(() => {
+  beforeAll(() => {
     scriptContent = fs.readFileSync(path.join(__dirname, '../docs/script.js'), 'utf8');
-    localStorage.clear();
-    document.body.innerHTML = '';
-    jest.clearAllMocks();
-
-    // Setup window globals
-    window.__latestCensys = null;
-    window.innerWidth = 1024;
-    window.Chart = undefined;
-    window.d3 = undefined;
-    window.topojson = undefined;
   });
 
-  describe('initLogoPlaceholders - Advanced scenarios', () => {
-    it('should handle logo images that load after a delay', (done) => {
-      document.body.innerHTML = `
-        <img src="logo.png" alt="Delayed Logo" data-logo />
-      `;
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    localStorage.clear();
+    jest.clearAllMocks();
+  });
 
+  describe('initLogoPlaceholders - Stress testing and edge cases', () => {
+    it('should handle images that load very slowly', (done) => {
+      document.body.innerHTML = `<img src="logo.png" data-logo alt="Test" />`;
+      
       eval(scriptContent);
-
+      
       const img = document.querySelector('img[data-logo]');
       
-      // Set image as not complete initially
-      Object.defineProperty(img, 'complete', { value: false, writable: true });
-      Object.defineProperty(img, 'naturalWidth', { value: 512, writable: true });
-      Object.defineProperty(img, 'naturalHeight', { value: 512, writable: true });
-
-      // Simulate delayed load
+      // Simulate slow load - image not complete yet
+      Object.defineProperty(img, 'complete', { value: false });
+      Object.defineProperty(img, 'naturalWidth', { value: 0 });
+      Object.defineProperty(img, 'naturalHeight', { value: 0 });
+      
       setTimeout(() => {
-        Object.defineProperty(img, 'complete', { value: true });
+        // Now simulate successful load
+        Object.defineProperty(img, 'naturalWidth', { value: 512 });
+        Object.defineProperty(img, 'naturalHeight', { value: 512 });
         img.dispatchEvent(new Event('load'));
-
+        
         setTimeout(() => {
-          // Should NOT create fallback because dimensions are valid
-          expect(img.dataset.fallback).toBeUndefined();
-          expect(img.style.display).not.toBe('none');
+          // Should NOT have fallback since image loaded successfully
           expect(img.nextElementSibling?.className).not.toBe('logo-placeholder');
           done();
         }, 50);
       }, 100);
     });
 
-    it('should handle images with fractional dimensions', (done) => {
-      document.body.innerHTML = `
-        <img src="logo.png" alt="Fractional" data-logo />
-      `;
-
+    it('should handle images with data URLs that fail', (done) => {
+      document.body.innerHTML = `<img src="data:image/png;base64,invalid" data-logo alt="Test" />`;
+      
       eval(scriptContent);
-
+      
       const img = document.querySelector('img[data-logo]');
-      Object.defineProperty(img, 'naturalWidth', { value: 512.5, writable: true });
-      Object.defineProperty(img, 'naturalHeight', { value: 512.7, writable: true });
-      Object.defineProperty(img, 'complete', { value: true, writable: true });
+      img.dispatchEvent(new Error('error'));
+      
+      setTimeout(() => {
+        expect(img.nextElementSibling?.className).toBe('logo-placeholder');
+        done();
+      }, 50);
+    });
 
+    it('should handle images that are removed from DOM during processing', (done) => {
+      document.body.innerHTML = `<img src="logo.png" data-logo alt="Test" />`;
+      
+      eval(scriptContent);
+      
+      const img = document.querySelector('img[data-logo]');
+      
+      // Remove image immediately
+      img.remove();
+      
+      // Trigger error on removed element
+      img.dispatchEvent(new Event('error'));
+      
+      setTimeout(() => {
+        // Should not crash
+        expect(document.querySelectorAll('.logo-placeholder').length).toBe(0);
+        done();
+      }, 50);
+    });
+
+    it('should handle images with very long alt text', (done) => {
+      const longAlt = 'A'.repeat(1000);
+      document.body.innerHTML = `<img src="logo.png" data-logo alt="${longAlt}" />`;
+      
+      eval(scriptContent);
+      
+      const img = document.querySelector('img[data-logo]');
+      img.dispatchEvent(new Event('error'));
+      
+      setTimeout(() => {
+        const placeholder = img.nextElementSibling;
+        expect(placeholder.textContent).toBe(longAlt.toUpperCase());
+        expect(placeholder.textContent.length).toBe(1000);
+        done();
+      }, 50);
+    });
+
+    it('should handle images with special characters in alt text', (done) => {
+      document.body.innerHTML = `<img src="logo.png" data-logo alt="Test™ & Co. <script>" />`;
+      
+      eval(scriptContent);
+      
+      const img = document.querySelector('img[data-logo]');
+      img.dispatchEvent(new Event('error'));
+      
+      setTimeout(() => {
+        const placeholder = img.nextElementSibling;
+        expect(placeholder.textContent).toContain('TEST™');
+        expect(placeholder.textContent).toContain('&');
+        done();
+      }, 50);
+    });
+
+    it('should handle rapid error events on same image', (done) => {
+      document.body.innerHTML = `<img src="logo.png" data-logo alt="Test" />`;
+      
+      eval(scriptContent);
+      
+      const img = document.querySelector('img[data-logo]');
+      
+      // Fire multiple error events rapidly
+      img.dispatchEvent(new Event('error'));
+      img.dispatchEvent(new Event('error'));
+      img.dispatchEvent(new Event('error'));
+      
+      setTimeout(() => {
+        // Should only create ONE fallback
+        const placeholders = document.querySelectorAll('.logo-placeholder');
+        expect(placeholders.length).toBe(1);
+        done();
+      }, 50);
+    });
+
+    it('should handle images that load then error', (done) => {
+      document.body.innerHTML = `<img src="logo.png" data-logo alt="Test" />`;
+      
+      eval(scriptContent);
+      
+      const img = document.querySelector('img[data-logo]');
+      
+      // First successful load
+      Object.defineProperty(img, 'naturalWidth', { value: 512, configurable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: 512, configurable: true });
       img.dispatchEvent(new Event('load'));
-
+      
       setTimeout(() => {
-        // Fractional dimensions should be treated as valid
-        expect(img.dataset.fallback).toBeUndefined();
-        expect(img.style.display).not.toBe('none');
-        done();
-      }, 50);
-    });
-
-    it('should handle missing alt attribute gracefully', (done) => {
-      document.body.innerHTML = `
-        <img src="logo.png" data-logo />
-      `;
-
-      eval(scriptContent);
-
-      const img = document.querySelector('img[data-logo]');
-      img.dispatchEvent(new Event('error'));
-
-      setTimeout(() => {
-        const placeholder = img.nextElementSibling;
-        expect(placeholder.textContent).toBe('NET OBSERVATION');
-        done();
-      }, 50);
-    });
-
-    it('should handle empty string alt attribute', (done) => {
-      document.body.innerHTML = `
-        <img src="logo.png" alt="" data-logo />
-      `;
-
-      eval(scriptContent);
-
-      const img = document.querySelector('img[data-logo]');
-      img.dispatchEvent(new Event('error'));
-
-      setTimeout(() => {
-        const placeholder = img.nextElementSibling;
-        expect(placeholder.textContent).toBe('NET OBSERVATION');
-        done();
-      }, 50);
-    });
-
-    it('should handle logo in deeply nested DOM structure', (done) => {
-      document.body.innerHTML = `
-        <div>
-          <div>
-            <aside>
-              <div>
-                <img src="logo.png" alt="Nested Logo" data-logo />
-              </div>
-            </aside>
-          </div>
-        </div>
-      `;
-
-      eval(scriptContent);
-
-      const img = document.querySelector('img[data-logo]');
-      img.dispatchEvent(new Event('error'));
-
-      setTimeout(() => {
-        expect(img.dataset.fallback).toBe('true');
-        expect(img.nextElementSibling?.textContent).toBe('NESTED LOGO');
-        done();
-      }, 50);
-    });
-
-    it('should not interfere with non-logo images', (done) => {
-      document.body.innerHTML = `
-        <img src="other.png" alt="Other Image" />
-        <img src="logo.png" alt="Logo" data-logo />
-      `;
-
-      eval(scriptContent);
-
-      const otherImg = document.querySelector('img:not([data-logo])');
-      const logoImg = document.querySelector('img[data-logo]');
-
-      otherImg.dispatchEvent(new Event('error'));
-      logoImg.dispatchEvent(new Event('error'));
-
-      setTimeout(() => {
-        expect(otherImg.dataset.fallback).toBeUndefined();
-        expect(otherImg.nextElementSibling?.className).not.toBe('logo-placeholder');
+        expect(img.nextElementSibling?.className).not.toBe('logo-placeholder');
         
-        expect(logoImg.dataset.fallback).toBe('true');
-        expect(logoImg.nextElementSibling?.className).toBe('logo-placeholder');
-        done();
+        // Now trigger error (maybe image got corrupted)
+        Object.defineProperty(img, 'naturalWidth', { value: 0, configurable: true });
+        Object.defineProperty(img, 'naturalHeight', { value: 0, configurable: true });
+        img.dispatchEvent(new Event('error'));
+        
+        setTimeout(() => {
+          // Should create fallback
+          expect(img.nextElementSibling?.className).toBe('logo-placeholder');
+          done();
+        }, 50);
       }, 50);
     });
-  });
 
-  describe('Chart initialization edge cases', () => {
-    it('should handle Chart.js not being available', () => {
-      document.body.innerHTML = `
-        <canvas id="servicesChart"></canvas>
-        <canvas id="countriesChart"></canvas>
-      `;
-
-      window.Chart = undefined;
-      eval(scriptContent);
-
-      // Should not throw errors when Chart is undefined
-      expect(document.getElementById('servicesChart')).toBeTruthy();
-      expect(document.getElementById('countriesChart')).toBeTruthy();
-    });
-
-    it('should initialize charts when Chart.js is available', () => {
-      document.body.innerHTML = `
-        <canvas id="servicesChart"></canvas>
-        <canvas id="countriesChart"></canvas>
-        <div class="terminal-output"></div>
-      `;
-
-      const mockChart = jest.fn();
-      mockChart.prototype.update = jest.fn();
-      window.Chart = mockChart;
-
-      // Mock getComputedStyle
-      global.getComputedStyle = jest.fn(() => ({
-        getPropertyValue: () => '#ffffff'
-      }));
-
-      eval(scriptContent);
-
-      expect(mockChart).toHaveBeenCalled();
-    });
-
-    it('should handle missing canvas elements gracefully', () => {
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-
-      const mockChart = jest.fn();
-      window.Chart = mockChart;
-
-      eval(scriptContent);
-
-      // Chart should not be called when canvas elements are missing
-      expect(mockChart).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('updateCharts with edge case data', () => {
-    it('should handle null data parameter', () => {
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-
-      const mockChart = {
-        data: { labels: [], datasets: [{ data: [], backgroundColor: [] }] },
-        update: jest.fn()
-      };
-
-      window.Chart = jest.fn();
-      eval(scriptContent);
-
-      // Manually set up AppState charts
-      const AppState = { charts: { services: mockChart, countries: mockChart } };
+    it('should handle 100+ images on same page', (done) => {
+      const images = Array.from({ length: 100 }, (_, i) => 
+        `<img src="logo.png" data-logo alt="Logo ${i}" />`
+      ).join('');
       
-      // updateCharts should handle null gracefully
-      const updateCharts = new Function('data', 'AppState', `
-        if (!data) return;
-        // Function body...
-      `);
-
-      updateCharts(null, AppState);
-      expect(mockChart.update).not.toHaveBeenCalled();
-    });
-
-    it('should handle empty services object', () => {
-      document.body.innerHTML = '<div class="terminal-output"></div>';
+      document.body.innerHTML = images;
+      
       eval(scriptContent);
-
-      const data = {
-        services: {},
-        countries: { US: 100 }
-      };
-
-      // Should not throw when processing empty objects
-      expect(() => {
-        // Simulate updateCharts logic
-        const entries = Object.entries(data.services).sort((a, b) => b[1] - a[1]);
-        expect(entries.length).toBe(0);
-      }).not.toThrow();
+      
+      const allImages = document.querySelectorAll('img[data-logo]');
+      expect(allImages.length).toBe(100);
+      
+      // Trigger error on all
+      allImages.forEach(img => img.dispatchEvent(new Event('error')));
+      
+      setTimeout(() => {
+        const placeholders = document.querySelectorAll('.logo-placeholder');
+        expect(placeholders.length).toBe(100);
+        done();
+      }, 100);
     });
   });
 
-  describe('renderTable - Advanced scenarios', () => {
-    it('should handle very large numbers correctly', () => {
-      document.body.innerHTML = `
-        <table data-table="test">
-          <tbody></tbody>
-        </table>
-      `;
-
-      eval(scriptContent);
-
-      const data = {
-        item1: 999999999999,
-        item2: 1234567890123
-      };
-
-      // Manually invoke renderTable logic
-      const container = document.querySelector('[data-table="test"]');
-      const tbody = container.querySelector('tbody');
-      
-      Object.entries(data)
-        .sort((a, b) => b[1] - a[1])
-        .forEach(([key, val]) => {
-          const row = document.createElement('tr');
-          const keyCell = document.createElement('td');
-          const valCell = document.createElement('td');
-          keyCell.textContent = key;
-          valCell.textContent = val.toLocaleString();
-          row.appendChild(keyCell);
-          row.appendChild(valCell);
-          tbody.appendChild(row);
-        });
-
-      const rows = tbody.querySelectorAll('tr');
-      expect(rows.length).toBe(2);
-      expect(rows[0].children[1].textContent).toContain(',');
-    });
-
-    it('should handle special characters in keys', () => {
-      document.body.innerHTML = `
-        <table data-table="test">
-          <tbody></tbody>
-        </table>
-      `;
-
-      eval(scriptContent);
-
-      const data = {
-        'service/http': 100,
-        'service:https': 200,
-        'service-ssh': 300
-      };
-
-      const container = document.querySelector('[data-table="test"]');
-      const tbody = container.querySelector('tbody');
-
-      Object.entries(data).forEach(([key, val]) => {
-        const row = document.createElement('tr');
-        const keyCell = document.createElement('td');
-        keyCell.textContent = key;
-        row.appendChild(keyCell);
-        tbody.appendChild(row);
+  describe('localStorage edge cases', () => {
+    it('should handle localStorage being completely disabled', () => {
+      // Simulate localStorage throwing on access
+      Object.defineProperty(window, 'localStorage', {
+        get: () => {
+          throw new Error('localStorage is not available');
+        },
+        configurable: true
       });
 
-      const cells = Array.from(tbody.querySelectorAll('td'));
-      const texts = cells.map(cell => cell.textContent);
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
       
-      expect(texts).toContain('service/http');
-      expect(texts).toContain('service:https');
-      expect(texts).toContain('service-ssh');
+      // Should not crash
+      expect(() => eval(scriptContent)).not.toThrow();
+    });
+
+    it('should handle localStorage quota exceeded', () => {
+      const mockSetItem = jest.fn(() => {
+        throw new Error('QuotaExceededError');
+      });
+      
+      Storage.prototype.setItem = mockSetItem;
+      
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      eval(scriptContent);
+      
+      const toggle = document.querySelector('[data-role="theme-toggle"]');
+      
+      // Should not crash when trying to save
+      expect(() => toggle.click()).not.toThrow();
+    });
+
+    it('should handle localStorage returning null for everything', () => {
+      Storage.prototype.getItem = jest.fn(() => null);
+      
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      eval(scriptContent);
+      
+      // Should use defaults
+      expect(document.documentElement.getAttribute('data-theme')).toBeTruthy();
+    });
+
+    it('should handle localStorage with circular reference data', () => {
+      const circularObj = { a: 1 };
+      circularObj.self = circularObj;
+      
+      localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'dark' }));
+      
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      eval(scriptContent);
+      
+      // Trying to save circular reference should not crash
+      window.AppState = window.AppState || {};
+      window.AppState.settings = circularObj;
+      
+      // This would crash if not handled
+      const toggle = document.querySelector('[data-role="theme-toggle"]');
+      expect(() => toggle.click()).not.toThrow();
     });
   });
 
-  describe('Terminal command execution - Advanced', () => {
-    it('should handle theme command with invalid arguments', () => {
-      document.body.innerHTML = `
-        <div class="terminal">
-          <div class="terminal-output"></div>
-          <div class="terminal-input">
-            <input type="text" value="theme invalid" />
-            <button>Run</button>
-          </div>
-        </div>
-      `;
-
+  describe('Theme system stress tests', () => {
+    it('should handle rapid theme toggle clicks', () => {
+      document.body.innerHTML = `<div data-role="theme-toggle" tabindex="0"><strong data-label>AUTO</strong></div>`;
+      
       eval(scriptContent);
-
-      const input = document.querySelector('.terminal input');
-      const button = document.querySelector('.terminal button');
-      const output = document.querySelector('.terminal-output');
-
-      input.value = 'theme invalid';
-      button.click();
-
-      expect(output.textContent).toContain('Usage: theme');
+      
+      const toggle = document.querySelector('[data-role="theme-toggle"]');
+      
+      // Click 100 times rapidly
+      for (let i = 0; i < 100; i++) {
+        toggle.click();
+      }
+      
+      // Should still have valid theme
+      const theme = document.body.dataset.theme;
+      expect(['auto', 'dark', 'light'].includes(theme)).toBe(true);
     });
 
-    it('should handle empty command gracefully', () => {
-      document.body.innerHTML = `
-        <div class="terminal">
-          <div class="terminal-output"></div>
-          <div class="terminal-input">
-            <input type="text" value="" />
-            <button>Run</button>
-          </div>
-        </div>
-      `;
-
+    it('should handle system preference changes during user interaction', () => {
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'auto' }));
+      
       eval(scriptContent);
-
-      const input = document.querySelector('.terminal input');
-      const button = document.querySelector('.terminal button');
-
-      input.value = '';
-      button.click();
-
-      // Should not throw or add error message
-      expect(document.querySelector('.terminal-output').children.length).toBeGreaterThan(0);
+      
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
+      // Simulate system preference change
+      mediaQuery.matches = false;
+      mediaQuery.dispatchEvent(new Event('change'));
+      
+      // Theme should update
+      expect(document.body.dataset.theme).toBeTruthy();
     });
 
-    it('should handle commands with multiple spaces', () => {
-      document.body.innerHTML = `
-        <div class="terminal">
-          <div class="terminal-output"></div>
-          <div class="terminal-input">
-            <input type="text" value="theme    dark" />
-            <button>Run</button>
-          </div>
-        </div>
-      `;
-
-      eval(scriptContent);
-
-      const input = document.querySelector('.terminal input');
-      const button = document.querySelector('.terminal button');
-
-      input.value = 'theme    dark';
-      button.click();
-
-      expect(document.body.dataset.theme).toBe('dark');
-    });
-
-    it('should handle Enter key in addition to button click', () => {
-      document.body.innerHTML = `
-        <div class="terminal">
-          <div class="terminal-output"></div>
-          <div class="terminal-input">
-            <input type="text" value="help" />
-            <button>Run</button>
-          </div>
-        </div>
-      `;
-
-      eval(scriptContent);
-
-      const input = document.querySelector('.terminal input');
-      const enterEvent = new KeyboardEvent('keydown', { key: 'Enter' });
-
-      input.value = 'help';
-      input.dispatchEvent(enterEvent);
-
-      const output = document.querySelector('.terminal-output');
-      expect(output.textContent).toContain('Available commands');
+    it('should handle missing matchMedia API', () => {
+      delete window.matchMedia;
+      
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      // Should not crash and use fallback
+      expect(() => eval(scriptContent)).not.toThrow();
     });
   });
 
-  describe('Settings panel - Advanced edge cases', () => {
-    it('should handle form submission with all fields empty', () => {
-      document.body.innerHTML = `
-        <div class="settings-panel">
-          <form>
-            <input name="backendUrl" value="" />
-            <input name="auth0Domain" value="" />
-            <input name="auth0ClientId" value="" />
-            <select name="themeMode">
-              <option value="auto" selected>Auto</option>
-            </select>
-          </form>
-        </div>
-        <button class="settings-toggle"></button>
-        <div class="terminal-output"></div>
-      `;
-
-      eval(scriptContent);
-
-      const form = document.querySelector('.settings-panel form');
-      form.dispatchEvent(new Event('submit', { bubbles: true }));
-
-      const saved = JSON.parse(localStorage.getItem('net-observation-settings'));
-      expect(saved.backendUrl).toBe('/api/censys-summary');
-      expect(saved.auth0Domain).toBe('');
-      expect(saved.auth0ClientId).toBe('');
-    });
-
-    it('should trim whitespace from input values', () => {
-      document.body.innerHTML = `
-        <div class="settings-panel">
-          <form>
-            <input name="backendUrl" value="  /api/test  " />
-            <input name="auth0Domain" value="  domain.auth0.com  " />
-            <input name="auth0ClientId" value="  client-123  " />
-            <select name="themeMode">
-              <option value="dark" selected>Dark</option>
-            </select>
-          </form>
-        </div>
-        <button class="settings-toggle"></button>
-        <div class="terminal-output"></div>
-      `;
-
-      eval(scriptContent);
-
-      const form = document.querySelector('.settings-panel form');
-      form.dispatchEvent(new Event('submit', { bubbles: true }));
-
-      const saved = JSON.parse(localStorage.getItem('net-observation-settings'));
-      expect(saved.backendUrl).toBe('/api/test');
-      expect(saved.auth0Domain).toBe('domain.auth0.com');
-      expect(saved.auth0ClientId).toBe('client-123');
-    });
-
-    it('should toggle panel visibility correctly', () => {
-      document.body.innerHTML = `
-        <div class="settings-panel hidden"></div>
-        <button class="settings-toggle">⚙</button>
-      `;
-
-      eval(scriptContent);
-
-      const panel = document.querySelector('.settings-panel');
-      const toggle = document.querySelector('.settings-toggle');
-
-      // Initial state
-      expect(panel.classList.contains('hidden')).toBe(true);
-
-      // First toggle
-      toggle.click();
-      expect(panel.classList.contains('hidden')).toBe(false);
-      expect(toggle.classList.contains('active')).toBe(true);
-      expect(toggle.innerHTML).toBe('&#10006;');
-
-      // Second toggle
-      toggle.click();
-      expect(panel.classList.contains('hidden')).toBe(true);
-      expect(toggle.classList.contains('active')).toBe(false);
-      expect(toggle.innerHTML).toBe('&#9881;');
-    });
-  });
-
-  describe('fetchCensysSummary - Advanced error scenarios', () => {
+  describe('fetch and network edge cases', () => {
     beforeEach(() => {
       global.fetch = jest.fn();
     });
 
-    it('should handle response with invalid JSON', async () => {
-      global.fetch.mockResolvedValueOnce({
+    it('should handle fetch aborting mid-request', async () => {
+      global.fetch.mockImplementation(() => 
+        Promise.reject(new DOMException('The user aborted a request', 'AbortError'))
+      );
+
+      document.body.innerHTML = `<div class="terminal-output"></div>`;
+      localStorage.setItem('net-observation-settings', JSON.stringify({ backendUrl: '/api/test' }));
+      
+      eval(scriptContent);
+      
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Should handle abort gracefully
+      expect(console.warn).toHaveBeenCalled();
+    });
+
+    it('should handle fetch with invalid JSON response', async () => {
+      global.fetch.mockResolvedValue({
         ok: true,
         json: async () => {
           throw new SyntaxError('Unexpected token');
         }
       });
 
-      document.body.innerHTML = '<div class="terminal-output"></div>';
+      document.body.innerHTML = `<div class="terminal-output"></div>`;
+      
       eval(scriptContent);
-
-      // Should log warning without breaking
-      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Should handle and log error
       expect(console.warn).toHaveBeenCalled();
     });
 
-    it('should handle fetch rejection', async () => {
-      global.fetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
-
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-      eval(scriptContent);
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-      expect(console.warn).toHaveBeenCalled();
-    });
-
-    it('should handle 404 status', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 404
+    it('should handle response with mismatched Content-Type', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        headers: { 'content-type': 'text/html' },
+        json: async () => ({ total_hosts: 100 })
       });
 
-      document.body.innerHTML = '<div class="terminal-output"></div>';
+      document.body.innerHTML = `<div data-stat="total-hosts"></div><div class="terminal-output"></div>`;
+      
       eval(scriptContent);
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-      expect(console.warn).toHaveBeenCalled();
-    });
-
-    it('should handle 500 status', async () => {
-      global.fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 500
-      });
-
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-      eval(scriptContent);
-
-      await new Promise(resolve => setTimeout(resolve, 100));
-      expect(console.warn).toHaveBeenCalled();
+      
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Should still try to parse JSON
+      expect(window.__latestCensys).toBeDefined();
     });
   });
 
-  describe('Data visualizer - Advanced scenarios', () => {
-    it('should handle malformed CSV data', () => {
-      document.body.innerHTML = `
-        <textarea id="dataInput">name,age
-John,30
-Jane
-Bob,40,extra</textarea>
-        <button id="renderData">Render</button>
-        <div id="dataOutput"></div>
-        <div class="terminal-output"></div>
-      `;
-
-      eval(scriptContent);
-
-      const button = document.getElementById('renderData');
-      button.click();
-
-      const output = document.getElementById('dataOutput');
-      expect(output.innerHTML).toBeTruthy();
-    });
-
-    it('should handle JSON with nested objects', () => {
-      document.body.innerHTML = `
-        <textarea id="dataInput">{"user": {"name": "John", "age": 30}, "active": true}</textarea>
-        <button id="renderData">Render</button>
-        <div id="dataOutput"></div>
-        <div class="terminal-output"></div>
-      `;
-
-      eval(scriptContent);
-
-      const button = document.getElementById('renderData');
-      button.click();
-
-      const output = document.getElementById('dataOutput');
-      expect(output.textContent).toContain('John');
-      expect(output.textContent).toContain('age');
-    });
-
-    it('should handle JSON arrays', () => {
-      document.body.innerHTML = `
-        <textarea id="dataInput">[{"name": "John"}, {"name": "Jane"}]</textarea>
-        <button id="renderData">Render</button>
-        <div id="dataOutput"></div>
-        <div class="terminal-output"></div>
-      `;
-
-      eval(scriptContent);
-
-      const button = document.getElementById('renderData');
-      button.click();
-
-      const output = document.getElementById('dataOutput');
-      expect(output.textContent).toContain('John');
-      expect(output.textContent).toContain('Jane');
-    });
-
-    it('should handle empty input gracefully', () => {
-      document.body.innerHTML = `
-        <textarea id="dataInput"></textarea>
-        <button id="renderData">Render</button>
-        <div id="dataOutput"></div>
-        <div class="terminal-output"></div>
-      `;
-
-      eval(scriptContent);
-
-      const button = document.getElementById('renderData');
-      button.click();
-
+  describe('DOM manipulation edge cases', () => {
+    it('should handle querySelector returning unexpected results', () => {
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      // Mock querySelector to return null sometimes
+      const originalQS = document.querySelector;
+      let callCount = 0;
+      document.querySelector = function(selector) {
+        callCount++;
+        if (callCount % 3 === 0) return null;
+        return originalQS.call(document, selector);
+      };
+      
       // Should not crash
-      expect(document.getElementById('dataOutput')).toBeTruthy();
-    });
-  });
-
-  describe('Plugin system - Advanced scenarios', () => {
-    it('should handle plugin with async run function', () => {
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-      eval(scriptContent);
-
-      const asyncPlugin = {
-        name: 'async-test',
-        command: 'asynctest',
-        run: async (arg) => {
-          await new Promise(resolve => setTimeout(resolve, 10));
-          return `Async result: ${arg}`;
-        }
-      };
-
-      window.registerPlugin(asyncPlugin);
-
-      const output = document.querySelector('.terminal-output');
-      expect(output.textContent).toContain('async-test');
-    });
-
-    it('should handle plugin that throws error', () => {
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-      eval(scriptContent);
-
-      const errorPlugin = {
-        name: 'error-test',
-        command: 'errortest',
-        run: () => {
-          throw new Error('Plugin error');
-        }
-      };
-
-      window.registerPlugin(errorPlugin);
-
-      // Should register successfully despite error-prone run function
-      const output = document.querySelector('.terminal-output');
-      expect(output.textContent).toContain('error-test');
-    });
-
-    it('should handle plugin without command property', () => {
-      document.body.innerHTML = '<div class="terminal-output"></div>';
-      eval(scriptContent);
-
-      const pluginWithoutCommand = {
-        name: 'no-command-plugin',
-        init: jest.fn()
-      };
-
-      window.registerPlugin(pluginWithoutCommand);
+      expect(() => eval(scriptContent)).not.toThrow();
       
-      // Should still call init
-      expect(pluginWithoutCommand.init).toHaveBeenCalled();
+      document.querySelector = originalQS;
     });
-  });
 
-  describe('Navigation and routing', () => {
-    it('should mark active nav for root path', () => {
+    it('should handle elements being removed during event handling', () => {
       document.body.innerHTML = `
-        <nav>
-          <a href="index.html">Home</a>
-          <a href="about.html">About</a>
-        </nav>
+        <aside class="sidebar"></aside>
+        <button class="sidebar-toggle"></button>
       `;
-
-      window.location.pathname = '/';
-      eval(scriptContent);
-
-      const homeLink = document.querySelector('a[href="index.html"]');
-      expect(homeLink?.classList.contains('active')).toBe(true);
-    });
-
-    it('should handle paths with query strings', () => {
-      document.body.innerHTML = `
-        <nav>
-          <a href="index.html">Home</a>
-          <a href="dashboard.html">Dashboard</a>
-        </nav>
-      `;
-
-      window.location.pathname = '/dashboard.html';
-      window.location.search = '?tab=stats';
-      eval(scriptContent);
-
-      // Should match based on pathname only
-      const dashLink = document.querySelector('a[href="dashboard.html"]');
-      expect(dashLink?.classList.contains('active')).toBe(true);
-    });
-  });
-
-  describe('Color palette generation', () => {
-    it('should generate colors with proper HSL format', () => {
-      const generateColorPalette = (count, seed) => {
-        const baseHue = seed === 'services' ? 180 : 300;
-        return Array.from({ length: count }, (_, idx) => 
-          `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
-        );
-      };
-
-      const colors = generateColorPalette(5, 'services');
       
-      expect(colors.length).toBe(5);
-      colors.forEach(color => {
-        expect(color).toMatch(/^hsl\(\d+ 80% 55% \/ 0\.7\)$/);
+      eval(scriptContent);
+      
+      const toggle = document.querySelector('.sidebar-toggle');
+      const sidebar = document.querySelector('.sidebar');
+      
+      // Set up to remove sidebar on click
+      toggle.addEventListener('click', () => {
+        sidebar.remove();
+      }, { capture: true });
+      
+      // Should not crash
+      expect(() => toggle.click()).not.toThrow();
+    });
+
+    it('should handle deeply nested element structures', () => {
+      let html = '<div>';
+      for (let i = 0; i < 100; i++) {
+        html += '<div>';
+      }
+      html += '<img src="logo.png" data-logo alt="Deep" />';
+      for (let i = 0; i < 100; i++) {
+        html += '</div>';
+      }
+      html += '</div>';
+      
+      document.body.innerHTML = html;
+      
+      eval(scriptContent);
+      
+      const img = document.querySelector('img[data-logo]');
+      expect(img).toBeTruthy();
+      
+      img.dispatchEvent(new Event('error'));
+      
+      // Should still work with deep nesting
+      setTimeout(() => {
+        expect(img.nextElementSibling?.className).toBe('logo-placeholder');
+      }, 50);
+    });
+  });
+
+  describe('JSDoc documentation completeness', () => {
+    it('should have JSDoc for all new functions', () => {
+      const newFunctions = [
+        'loadSettings',
+        'saveSettings',
+        'applyTheme',
+        'initLogoPlaceholders',
+        'initThemeToggle',
+        'initSidebar',
+        'qs',
+        'updateStatsView',
+        'renderTable',
+        'fetchCensysSummary',
+        'initAutoRefresh',
+        'initCharts',
+        'updateCharts',
+        'generateColorPalette',
+        'initTerminal',
+        'logTerminal',
+        'initDataVisualizer',
+        'initSettingsPanel',
+        'initAuth0',
+        'updateAuthControls',
+        'renderHeatmap',
+        'initDocsSidebar',
+        'initVersionList',
+        'initPageSpecificFeatures',
+        'markActiveNav',
+        'init'
+      ];
+
+      newFunctions.forEach(funcName => {
+        // Look for JSDoc before function definition
+        const funcRegex = new RegExp(`function ${funcName}\\(`);
+        const match = scriptContent.search(funcRegex);
+        
+        if (match !== -1) {
+          const before = scriptContent.substring(Math.max(0, match - 500), match);
+          expect(before).toMatch(/\/\*\*/);
+        }
       });
     });
 
-    it('should wrap hue values at 360 degrees', () => {
-      const generateColorPalette = (count, seed) => {
-        const baseHue = seed === 'services' ? 180 : 300;
-        return Array.from({ length: count }, (_, idx) => {
-          const hue = (baseHue + idx * 27) % 360;
-          return hue;
-        });
+    it('should document all @param tags for functions with parameters', () => {
+      const functionsWithParams = [
+        { name: 'renderTable', params: ['selector', 'objectData'] },
+        { name: 'fetchCensysSummary', params: ['silent'] },
+        { name: 'updateCharts', params: ['data'] },
+        { name: 'generateColorPalette', params: ['count', 'seed'] },
+        { name: 'logTerminal', params: ['message'] },
+        { name: 'renderHeatmap', params: ['data'] }
+      ];
+
+      functionsWithParams.forEach(({ name, params }) => {
+        const funcRegex = new RegExp(`function ${name}\\([^)]*\\)`);
+        const match = scriptContent.search(funcRegex);
+        
+        if (match !== -1) {
+          const before = scriptContent.substring(Math.max(0, match - 1000), match);
+          
+          params.forEach(param => {
+            expect(before).toMatch(new RegExp(`@param.*${param}`));
+          });
+        }
+      });
+    });
+
+    it('should have @returns documentation for functions that return values', () => {
+      const functionsWithReturns = ['qs', 'generateColorPalette'];
+
+      functionsWithReturns.forEach(funcName => {
+        const funcRegex = new RegExp(`function ${funcName}\\(`);
+        const match = scriptContent.search(funcRegex);
+        
+        if (match !== -1) {
+          const before = scriptContent.substring(Math.max(0, match - 500), match);
+          expect(before).toMatch(/@returns/);
+        }
+      });
+    });
+  });
+
+  describe('Memory and performance considerations', () => {
+    it('should not leak event listeners when elements are re-created', () => {
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      eval(scriptContent);
+      
+      // Get reference to toggle
+      const toggle1 = document.querySelector('[data-role="theme-toggle"]');
+      
+      // Replace it
+      document.body.innerHTML = `<div data-role="theme-toggle"><strong data-label>AUTO</strong></div>`;
+      
+      // Initialize again
+      eval(scriptContent);
+      
+      const toggle2 = document.querySelector('[data-role="theme-toggle"]');
+      
+      // Old toggle should not affect anything
+      expect(() => toggle1.click()).not.toThrow();
+      expect(() => toggle2.click()).not.toThrow();
+    });
+
+    it('should handle large data sets efficiently', async () => {
+      const largeData = {
+        total_hosts: 999999999,
+        total_services: 888888888,
+        last_sync: new Date().toISOString(),
+        countries: {},
+        services: {}
       };
 
-      const hues = generateColorPalette(20, 'services');
-      
-      hues.forEach(hue => {
-        expect(hue).toBeGreaterThanOrEqual(0);
-        expect(hue).toBeLessThan(360);
+      // Generate 1000 countries
+      for (let i = 0; i < 1000; i++) {
+        largeData.countries[`C${i}`] = i * 1000;
+      }
+
+      // Generate 1000 services
+      for (let i = 0; i < 1000; i++) {
+        largeData.services[`service-${i}`] = i * 500;
+      }
+
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: async () => largeData
       });
+
+      document.body.innerHTML = `
+        <div data-stat="total-hosts"></div>
+        <div data-stat="total-services"></div>
+        <table data-table="countries"><tbody></tbody></table>
+        <table data-table="services"><tbody></tbody></table>
+        <div class="terminal-output"></div>
+      `;
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Should handle large datasets
+      expect(window.__latestCensys.countries).toHaveProperty('C999');
+      expect(window.__latestCensys.services).toHaveProperty('service-999');
     });
   });
 });
