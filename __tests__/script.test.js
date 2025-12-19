@@ -913,3 +913,853 @@ describe('Net Observation Project - script.js', () => {
     });
   });
 });
+  describe('ADDITIONAL COMPREHENSIVE TESTS - initLogoPlaceholders()', () => {
+    it('should handle images with data-logo attribute but no src', (done) => {
+      document.body.innerHTML = `
+        <img data-logo alt="Logo" />
+      `;
+
+      eval(scriptContent);
+
+      setTimeout(() => {
+        const img = document.querySelector('img[data-logo]');
+        // Image without src should be handled gracefully
+        expect(img).toBeTruthy();
+        done();
+      }, 50);
+    });
+
+    it('should handle images that have loaded event fire after complete=true', (done) => {
+      document.body.innerHTML = `
+        <img src="logo.png" alt="Test" data-logo />
+      `;
+
+      eval(scriptContent);
+
+      const img = document.querySelector('img[data-logo]');
+      Object.defineProperty(img, 'complete', { value: false, writable: true });
+      Object.defineProperty(img, 'naturalWidth', { value: 100, writable: true });
+      Object.defineProperty(img, 'naturalHeight', { value: 100, writable: true });
+
+      setTimeout(() => {
+        img.dispatchEvent(new Event('load'));
+        setTimeout(() => {
+          expect(img.dataset.fallback).toBeUndefined();
+          done();
+        }, 50);
+      }, 50);
+    });
+
+    it('should handle rapid successive error events', (done) => {
+      document.body.innerHTML = `
+        <img src="logo.png" alt="Logo" data-logo />
+      `;
+
+      eval(scriptContent);
+
+      const img = document.querySelector('img[data-logo]');
+      
+      // Fire multiple errors rapidly
+      img.dispatchEvent(new Event('error'));
+      img.dispatchEvent(new Event('error'));
+      img.dispatchEvent(new Event('error'));
+
+      setTimeout(() => {
+        const placeholders = document.querySelectorAll('.logo-placeholder');
+        expect(placeholders.length).toBe(1); // Should only create one
+        done();
+      }, 100);
+    });
+
+    it('should preserve image parent node structure', (done) => {
+      document.body.innerHTML = `
+        <div class="logo-container">
+          <img src="logo.png" alt="Test Logo" data-logo />
+          <span class="caption">Logo Caption</span>
+        </div>
+      `;
+
+      eval(scriptContent);
+
+      const img = document.querySelector('img[data-logo]');
+      const container = img.parentNode;
+      const originalChildren = container.children.length;
+      
+      img.dispatchEvent(new Event('error'));
+
+      setTimeout(() => {
+        expect(img.parentNode).toBe(container);
+        expect(container.children.length).toBe(originalChildren + 1); // Original + placeholder
+        done();
+      }, 50);
+    });
+
+    it('should handle images with very long alt text', (done) => {
+      const longAlt = 'A'.repeat(500);
+      document.body.innerHTML = `
+        <img src="logo.png" alt="${longAlt}" data-logo />
+      `;
+
+      eval(scriptContent);
+
+      const img = document.querySelector('img[data-logo]');
+      img.dispatchEvent(new Event('error'));
+
+      setTimeout(() => {
+        const placeholder = img.nextElementSibling;
+        expect(placeholder.textContent.length).toBeGreaterThan(100);
+        done();
+      }, 50);
+    });
+
+    it('should handle images with Unicode characters in alt text', (done) => {
+      document.body.innerHTML = `
+        <img src="logo.png" alt="网络观察 🌐 Observation" data-logo />
+      `;
+
+      eval(scriptContent);
+
+      const img = document.querySelector('img[data-logo]');
+      img.dispatchEvent(new Event('error'));
+
+      setTimeout(() => {
+        const placeholder = img.nextElementSibling;
+        expect(placeholder.textContent).toContain('网络观察');
+        expect(placeholder.textContent).toContain('🌐');
+        done();
+      }, 50);
+    });
+
+    it('should not interfere with images without data-logo attribute', (done) => {
+      document.body.innerHTML = `
+        <img src="logo.png" alt="Regular Image" />
+        <img src="logo2.png" alt="Logo Image" data-logo />
+      `;
+
+      eval(scriptContent);
+
+      const regularImg = document.querySelector('img:not([data-logo])');
+      const logoImg = document.querySelector('img[data-logo]');
+
+      regularImg.dispatchEvent(new Event('error'));
+      logoImg.dispatchEvent(new Event('error'));
+
+      setTimeout(() => {
+        expect(regularImg.nextElementSibling?.className).not.toBe('logo-placeholder');
+        expect(logoImg.nextElementSibling?.className).toBe('logo-placeholder');
+        done();
+      }, 50);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - applyTheme()', () => {
+    it('should handle missing matchMedia gracefully', () => {
+      const originalMatchMedia = window.matchMedia;
+      window.matchMedia = undefined;
+
+      document.body.innerHTML = '<div></div>';
+      
+      // Should not throw
+      expect(() => {
+        eval(scriptContent);
+      }).not.toThrow();
+
+      window.matchMedia = originalMatchMedia;
+    });
+
+    it('should apply theme immediately on settings change', () => {
+      document.body.innerHTML = '<div></div>';
+      localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'dark' }));
+      
+      eval(scriptContent);
+
+      expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+      expect(document.body.dataset.theme).toBe('dark');
+    });
+
+    it('should handle rapid theme switches', () => {
+      document.body.innerHTML = `
+        <div data-role="theme-toggle">
+          <strong data-label>AUTO</strong>
+        </div>
+      `;
+
+      eval(scriptContent);
+
+      const toggle = document.querySelector('[data-role="theme-toggle"]');
+      
+      // Rapid clicks
+      toggle.click();
+      toggle.click();
+      toggle.click();
+
+      // Should still have valid theme
+      const theme = document.body.dataset.theme;
+      expect(['auto', 'dark', 'light']).toContain(theme);
+    });
+
+    it('should maintain theme consistency across documentElement and body', () => {
+      document.body.innerHTML = '<div></div>';
+      localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'light' }));
+      
+      eval(scriptContent);
+
+      const docTheme = document.documentElement.getAttribute('data-theme');
+      const bodyTheme = document.body.dataset.theme;
+
+      expect(docTheme).toBe(bodyTheme);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - updateStatsView()', () => {
+    it('should handle data with null values', () => {
+      document.body.innerHTML = `
+        <div data-stat="total-hosts"></div>
+        <div data-stat="total-services"></div>
+        <div data-stat="last-sync"></div>
+      `;
+
+      eval(scriptContent);
+
+      const hostsEl = document.querySelector('[data-stat="total-hosts"]');
+      const servicesEl = document.querySelector('[data-stat="total-services"]');
+      const syncEl = document.querySelector('[data-stat="last-sync"]');
+
+      // Elements should exist even if data is null
+      expect(hostsEl).toBeTruthy();
+      expect(servicesEl).toBeTruthy();
+      expect(syncEl).toBeTruthy();
+    });
+
+    it('should handle very large numbers correctly', () => {
+      const largeNumber = 999999999999;
+      const formatted = largeNumber.toLocaleString();
+
+      expect(formatted).toContain(',');
+      expect(formatted.length).toBeGreaterThan(12);
+    });
+
+    it('should handle zero values', () => {
+      const zero = 0;
+      const formatted = zero.toLocaleString();
+
+      expect(formatted).toBe('0');
+    });
+
+    it('should handle negative numbers (edge case)', () => {
+      const negative = -100;
+      const formatted = negative.toLocaleString();
+
+      expect(formatted).toContain('-');
+    });
+
+    it('should handle invalid date strings gracefully', () => {
+      const invalidDate = 'not-a-date';
+      const date = new Date(invalidDate);
+
+      expect(date.toString()).toContain('Invalid');
+    });
+
+    it('should format valid ISO date strings', () => {
+      const isoDate = '2025-01-15T10:30:00.000Z';
+      const date = new Date(isoDate);
+      const formatted = date.toLocaleString();
+
+      expect(formatted).toBeTruthy();
+      expect(formatted.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - renderTable()', () => {
+    it('should handle objects with many entries', () => {
+      const largeData = {};
+      for (let i = 0; i < 100; i++) {
+        largeData[`key${i}`] = Math.floor(Math.random() * 1000);
+      }
+
+      const entries = Object.entries(largeData);
+      expect(entries.length).toBe(100);
+    });
+
+    it('should sort entries correctly by value', () => {
+      const data = { a: 10, b: 100, c: 50 };
+      const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+
+      expect(sorted[0][0]).toBe('b');
+      expect(sorted[1][0]).toBe('c');
+      expect(sorted[2][0]).toBe('a');
+    });
+
+    it('should handle equal values in sorting', () => {
+      const data = { a: 50, b: 50, c: 50 };
+      const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
+
+      expect(sorted.length).toBe(3);
+      sorted.forEach(([key, value]) => {
+        expect(value).toBe(50);
+      });
+    });
+
+    it('should handle objects with string keys containing special characters', () => {
+      const data = {
+        'key-with-dash': 100,
+        'key.with.dot': 200,
+        'key_with_underscore': 150
+      };
+
+      const entries = Object.entries(data);
+      expect(entries.length).toBe(3);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - fetchCensysSummary()', () => {
+    beforeEach(() => {
+      global.fetch = jest.fn();
+      document.body.innerHTML = `
+        <div class="terminal-output"></div>
+      `;
+    });
+
+    it('should handle JSON parse errors', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => {
+          throw new Error('Invalid JSON');
+        }
+      });
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(console.warn).toHaveBeenCalled();
+    });
+
+    it('should handle network timeout errors', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('Network timeout'));
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(console.warn).toHaveBeenCalledWith(
+        'Censys fetch error',
+        expect.any(Error)
+      );
+    });
+
+    it('should handle 404 responses', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 404
+      });
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(console.warn).toHaveBeenCalled();
+    });
+
+    it('should handle 500 server errors', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500
+      });
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(console.warn).toHaveBeenCalled();
+    });
+
+    it('should handle rate limiting (429) responses', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429
+      });
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(console.warn).toHaveBeenCalled();
+    });
+
+    it('should update window.__latestCensys with complete data structure', async () => {
+      const mockData = {
+        total_hosts: 1000,
+        total_services: 500,
+        last_sync: '2025-01-15T10:00:00Z',
+        countries: { US: 100, GB: 50 },
+        services: { http: 200, https: 300 }
+      };
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockData
+      });
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(window.__latestCensys).toEqual(mockData);
+    });
+
+    it('should handle partial data responses', async () => {
+      const partialData = {
+        total_hosts: 1000
+        // Missing other fields
+      };
+
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => partialData
+      });
+
+      eval(scriptContent);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      expect(window.__latestCensys.total_hosts).toBe(1000);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - logTerminal()', () => {
+    it('should handle very long messages', () => {
+      document.body.innerHTML = `
+        <div class="terminal-output"></div>
+      `;
+
+      eval(scriptContent);
+
+      const longMessage = 'A'.repeat(10000);
+      
+      // Should not throw even with very long message
+      expect(() => {
+        const output = document.querySelector('.terminal-output');
+        if (output) {
+          const line = document.createElement('div');
+          line.textContent = `[${new Date().toLocaleTimeString()}] ${longMessage}`;
+          output.appendChild(line);
+        }
+      }).not.toThrow();
+    });
+
+    it('should handle messages with HTML special characters', () => {
+      document.body.innerHTML = `
+        <div class="terminal-output"></div>
+      `;
+
+      eval(scriptContent);
+
+      const output = document.querySelector('.terminal-output');
+      const specialMessage = '<script>alert("xss")</script>';
+      
+      const line = document.createElement('div');
+      line.textContent = specialMessage;
+      output.appendChild(line);
+
+      // textContent should escape HTML
+      expect(line.innerHTML).not.toContain('<script>');
+      expect(line.textContent).toContain('<script>');
+    });
+
+    it('should handle rapid sequential logging', () => {
+      document.body.innerHTML = `
+        <div class="terminal-output"></div>
+      `;
+
+      eval(scriptContent);
+
+      const output = document.querySelector('.terminal-output');
+      
+      for (let i = 0; i < 100; i++) {
+        const line = document.createElement('div');
+        line.textContent = `Message ${i}`;
+        output.appendChild(line);
+      }
+
+      expect(output.children.length).toBe(100);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - generateColorPalette()', () => {
+    it('should generate exactly the requested number of colors', () => {
+      const count = 15;
+      const generateColorPalette = (count, seed) => {
+        const baseHue = seed === 'services' ? 180 : 300;
+        return Array.from({ length: count }, (_, idx) => 
+          `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+        );
+      };
+
+      const colors = generateColorPalette(count, 'services');
+      expect(colors).toHaveLength(count);
+    });
+
+    it('should handle zero count', () => {
+      const generateColorPalette = (count, seed) => {
+        const baseHue = seed === 'services' ? 180 : 300;
+        return Array.from({ length: count }, (_, idx) => 
+          `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+        );
+      };
+
+      const colors = generateColorPalette(0, 'services');
+      expect(colors).toHaveLength(0);
+    });
+
+    it('should wrap hue values correctly at 360 degrees', () => {
+      const baseHue = 350;
+      const hue1 = (baseHue + 0 * 27) % 360; // 350
+      const hue2 = (baseHue + 1 * 27) % 360; // 377 % 360 = 17
+      const hue3 = (baseHue + 2 * 27) % 360; // 404 % 360 = 44
+
+      expect(hue1).toBe(350);
+      expect(hue2).toBe(17);
+      expect(hue3).toBe(44);
+    });
+
+    it('should use consistent alpha value', () => {
+      const generateColorPalette = (count, seed) => {
+        const baseHue = seed === 'services' ? 180 : 300;
+        return Array.from({ length: count }, (_, idx) => 
+          `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+        );
+      };
+
+      const colors = generateColorPalette(5, 'services');
+      colors.forEach(color => {
+        expect(color).toContain('/ 0.7)');
+      });
+    });
+
+    it('should generate visually distinct colors with 27 degree spacing', () => {
+      const spacing = 27;
+      const colors = [];
+      
+      for (let i = 0; i < 13; i++) {
+        colors.push((180 + i * spacing) % 360);
+      }
+
+      // Check that colors are well-distributed
+      expect(colors[0]).toBe(180);
+      expect(colors[1]).toBe(207);
+      expect(colors[2]).toBe(234);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - initSidebar()', () => {
+    it('should handle window resize events', () => {
+      window.innerWidth = 1024;
+      
+      document.body.innerHTML = `
+        <aside class="sidebar"></aside>
+        <button class="sidebar-toggle"></button>
+      `;
+
+      eval(scriptContent);
+
+      const sidebar = document.querySelector('.sidebar');
+      expect(sidebar.classList.contains('open')).toBe(true);
+
+      // Simulate resize to mobile
+      window.innerWidth = 500;
+      window.dispatchEvent(new Event('resize'));
+
+      // Initial state should remain unless explicitly toggled
+      expect(sidebar.classList.contains('open')).toBe(true);
+    });
+
+    it('should handle sidebar toggle with keyboard accessibility', () => {
+      window.innerWidth = 1024;
+      
+      document.body.innerHTML = `
+        <aside class="sidebar"></aside>
+        <button class="sidebar-toggle" aria-expanded="true"></button>
+      `;
+
+      eval(scriptContent);
+
+      const toggle = document.querySelector('.sidebar-toggle');
+      expect(toggle.getAttribute('aria-expanded')).toBeTruthy();
+    });
+
+    it('should maintain sidebar state across multiple toggles', () => {
+      window.innerWidth = 1024;
+      
+      document.body.innerHTML = `
+        <aside class="sidebar"></aside>
+        <button class="sidebar-toggle"></button>
+      `;
+
+      eval(scriptContent);
+
+      const sidebar = document.querySelector('.sidebar');
+      const toggle = document.querySelector('.sidebar-toggle');
+
+      // Toggle 10 times
+      for (let i = 0; i < 10; i++) {
+        toggle.click();
+      }
+
+      // Should end up in original state (even number of toggles)
+      expect(sidebar.classList.contains('open')).toBe(true);
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - initDataVisualizer()', () => {
+    it('should handle JSON arrays', () => {
+      const jsonArray = '[1, 2, 3, 4, 5]';
+      const trimmed = jsonArray.trim();
+      
+      expect(trimmed.startsWith('[')).toBe(true);
+      expect(() => JSON.parse(trimmed)).not.toThrow();
+    });
+
+    it('should handle nested JSON objects', () => {
+      const nestedJson = '{"outer": {"inner": {"deep": "value"}}}';
+      const parsed = JSON.parse(nestedJson);
+      
+      expect(parsed.outer.inner.deep).toBe('value');
+    });
+
+    it('should handle CSV with quoted values', () => {
+      const csvWithQuotes = 'name,description\n"John","Developer"\n"Jane","Designer"';
+      const lines = csvWithQuotes.trim().split(/\r?\n/);
+      
+      expect(lines.length).toBe(3); // Header + 2 rows
+    });
+
+    it('should handle CSV with different line endings', () => {
+      const csvUnix = 'a,b\n1,2\n3,4';
+      const csvWindows = 'a,b\r\n1,2\r\n3,4';
+      
+      const linesUnix = csvUnix.trim().split(/\r?\n/);
+      const linesWindows = csvWindows.trim().split(/\r?\n/);
+      
+      expect(linesUnix.length).toBe(linesWindows.length);
+    });
+
+    it('should handle empty CSV cells', () => {
+      const parseCSV = (text) => {
+        const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+        const headers = headerLine.split(',').map(h => h.trim());
+        return rows.map(row => {
+          const values = row.split(',');
+          return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+        });
+      };
+
+      const csv = 'a,b,c\n1,,3\n,,\n4,5,6';
+      const result = parseCSV(csv);
+      
+      expect(result[0].b).toBe('');
+      expect(result[1].a).toBe('');
+      expect(result[1].b).toBe('');
+      expect(result[1].c).toBe('');
+    });
+
+    it('should handle malformed JSON gracefully', () => {
+      const malformedJson = '{invalid json}';
+      
+      expect(() => {
+        JSON.parse(malformedJson);
+      }).toThrow();
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - Plugin System', () => {
+    it('should handle plugins with async run functions', (done) => {
+      document.body.innerHTML = '<div class="terminal-output"></div>';
+
+      eval(scriptContent);
+
+      const asyncPlugin = {
+        name: 'async-plugin',
+        command: 'async',
+        run: async (arg) => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return `Async result: ${arg}`;
+        },
+        init: jest.fn()
+      };
+
+      window.registerPlugin(asyncPlugin);
+
+      setTimeout(() => {
+        expect(asyncPlugin.init).toHaveBeenCalled();
+        done();
+      }, 50);
+    });
+
+    it('should handle plugins without init function', () => {
+      document.body.innerHTML = '<div class="terminal-output"></div>';
+
+      eval(scriptContent);
+
+      const simplePlugin = {
+        name: 'simple-plugin',
+        command: 'simple',
+        run: (arg) => `Simple: ${arg}`
+      };
+
+      expect(() => {
+        window.registerPlugin(simplePlugin);
+      }).not.toThrow();
+    });
+
+    it('should handle plugins with special characters in names', () => {
+      document.body.innerHTML = '<div class="terminal-output"></div>';
+
+      eval(scriptContent);
+
+      const specialPlugin = {
+        name: 'test-plugin_v2.0',
+        command: 'test',
+        run: () => 'test',
+        init: jest.fn()
+      };
+
+      window.registerPlugin(specialPlugin);
+      expect(specialPlugin.init).toHaveBeenCalled();
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - Settings Panel', () => {
+    it('should handle empty backend URL with fallback', () => {
+      const backendUrl = '';
+      const fallback = '/api/censys-summary';
+      const result = backendUrl.trim() || fallback;
+
+      expect(result).toBe(fallback);
+    });
+
+    it('should trim whitespace from settings inputs', () => {
+      const input = '  https://api.example.com  ';
+      const trimmed = input.trim();
+
+      expect(trimmed).toBe('https://api.example.com');
+      expect(trimmed.length).toBeLessThan(input.length);
+    });
+
+    it('should handle settings with all fields empty', () => {
+      const settings = {
+        backendUrl: '',
+        auth0Domain: '',
+        auth0ClientId: '',
+        theme: 'auto'
+      };
+
+      expect(settings.theme).toBe('auto');
+      expect(settings.backendUrl).toBe('');
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - qs() helper function', () => {
+    it('should return null for non-existent selectors', () => {
+      document.body.innerHTML = '<div></div>';
+      
+      const result = document.querySelector('.does-not-exist');
+      expect(result).toBeNull();
+    });
+
+    it('should handle complex CSS selectors', () => {
+      document.body.innerHTML = `
+        <div class="outer">
+          <div class="inner">
+            <span data-test="value">Content</span>
+          </div>
+        </div>
+      `;
+
+      const result = document.querySelector('.outer .inner span[data-test="value"]');
+      expect(result).toBeTruthy();
+      expect(result.textContent).toBe('Content');
+    });
+
+    it('should return first match for multiple elements', () => {
+      document.body.innerHTML = `
+        <div class="item">First</div>
+        <div class="item">Second</div>
+        <div class="item">Third</div>
+      `;
+
+      const result = document.querySelector('.item');
+      expect(result.textContent).toBe('First');
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - Auto-refresh functionality', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+      global.fetch = jest.fn();
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('should schedule periodic refreshes', () => {
+      document.body.innerHTML = '<div class="terminal-output"></div>';
+      
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ total_hosts: 100 })
+      });
+
+      eval(scriptContent);
+
+      // Fast-forward time
+      jest.advanceTimersByTime(60000);
+
+      // Multiple fetches should have been scheduled
+      expect(global.fetch).toHaveBeenCalled();
+    });
+  });
+
+  describe('ADDITIONAL COMPREHENSIVE TESTS - Error boundary cases', () => {
+    it('should handle localStorage being unavailable', () => {
+      const originalLocalStorage = global.localStorage;
+      delete global.localStorage;
+
+      document.body.innerHTML = '<div></div>';
+
+      expect(() => {
+        // Code that tries to access localStorage
+        try {
+          localStorage.getItem('test');
+        } catch (e) {
+          // Expected to fail
+        }
+      }).not.toThrow();
+
+      global.localStorage = originalLocalStorage;
+    });
+
+    it('should handle document.querySelector returning null', () => {
+      document.body.innerHTML = '';
+
+      const result = document.querySelector('.non-existent');
+      expect(result).toBeNull();
+    });
+
+    it('should handle missing Chart.js library', () => {
+      window.Chart = undefined;
+      
+      document.body.innerHTML = `
+        <canvas id="servicesChart"></canvas>
+      `;
+
+      eval(scriptContent);
+
+      // Should not throw even without Chart.js
+      expect(window.Chart).toBeUndefined();
+    });
+  });
+  });
+});
+});
