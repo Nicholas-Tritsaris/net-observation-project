@@ -19,11 +19,10 @@
     : { matches: true };
 
   /**
-   * Load persisted settings from localStorage into the in-memory AppState.settings.
+   * Load persisted settings from localStorage and merge them into AppState.settings.
    *
-   * If a JSON object is stored under STORAGE_KEY, its properties are shallow-merged
-   * into AppState.settings. On JSON parse or storage access errors, a warning is
-   * logged and AppState.settings is not modified.
+   * The stored JSON (if present under STORAGE_KEY) is shallow-merged into the existing settings.
+   * On JSON parse or storage access errors a warning is logged and AppState.settings remains unchanged.
    */
   function loadSettings() {
     try {
@@ -62,12 +61,11 @@
   }
 
   /**
-   * Replace missing or failed logo images with non-interactive text placeholders.
+   * Replace failed or missing logo images with non-interactive text placeholders.
    *
-   * For each <img data-logo> element, if the image fails to load or has no intrinsic size,
-   * the image is hidden, a per-image fallback flag is set to avoid repeated replacements,
-   * and a nearby placeholder element is inserted showing the image's alt text (or "NET OBSERVATION")
-   * in uppercase. The placeholder is marked aria-hidden.
+   * For each img[data-logo], hides the image and inserts a .logo-placeholder immediately after it
+   * displaying the image's alt text (or "NET OBSERVATION") in uppercase. The placeholder is marked
+   * aria-hidden and images are marked to avoid repeated replacements.
    */
   function initLogoPlaceholders() {
     const createFallback = (img) => {
@@ -147,11 +145,11 @@
   }
 
   /**
-   * Initialize the page sidebar's collapse/expand behavior and its toggle control.
+   * Initialize sidebar collapse/expand behavior and wire its toggle control.
    *
-   * Adds a click handler to the sidebar toggle that toggles `open`/`collapsed` classes on the sidebar,
-   * updates the toggle's `aria-expanded` attribute and icon, and sets the initial state (collapsed when
-   * window width is less than 880px).
+   * Binds the toggle button to open and close the sidebar, updates the toggle's
+   * `aria-expanded` state and icon to reflect the current state, and sets the
+   * initial sidebar state (collapsed when viewport width is less than 880px).
    */
   function initSidebar() {
     const sidebar = document.querySelector('.sidebar');
@@ -179,9 +177,9 @@
   }
 
   /**
-   * Return the first DOM element that matches the provided CSS selector.
-   * @param {string} id - CSS selector string to match against the document.
-   * @returns {Element|null} The first matching Element, or `null` if no element matches.
+   * Get the first DOM element that matches the CSS selector.
+   * @param {string} selector - CSS selector to query.
+   * @returns {Element|null} The first matching Element, or `null` if none is found.
    */
   function qs(id) {
     return document.querySelector(id);
@@ -213,15 +211,13 @@
   }
 
   /**
-   * Populate a table's tbody with rows from an object's entries sorted by value descending.
+   * Render object entries as rows into a table's tbody, sorted by value descending.
    *
-   * Clears the target tbody and appends one <tr> per entry where the first <td> is the object key
-   * and the second <td> is the numeric value formatted with Number(...).toLocaleString().
-   * No changes are made if the selector does not match an element, the element has no tbody,
-   * or if `objectData` is falsy.
+   * If the selector does not match an element, the element has no <tbody>, or `objectData` is falsy, the function performs no changes.
+   * Each entry becomes a <tr> with the key in the first cell and the numeric value in the second cell formatted with the current locale's separators.
    *
-   * @param {string} selector - CSS selector for a table element that contains a <tbody>.
-   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; values are sorted descending and formatted with locale separators.
+   * @param {string} selector - CSS selector for the target table element that must contain a <tbody>.
+   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; values are sorted descending and formatted with Number(value).toLocaleString().
    */
   function renderTable(selector, objectData) {
     const container = qs(selector);
@@ -331,12 +327,15 @@
   }
 
   /**
-   * Update the Chart.js service and country charts to reflect the provided summary data.
+   * Update Chart.js service and country charts from a summary data object.
    *
-   * Services are sorted by count (descending) and fully applied to the services chart.
-   * Countries are sorted by count (descending) and the top 12 are applied to the countries chart.
-   * Labels, dataset values, and dataset background colors are replaced and charts are refreshed.
-   * @param {Object} data - Summary data with optional properties `services` and `countries`, each a mapping of name to count (e.g., `{ services: { http: 10 }, countries: { US: 5 } }`).
+   * Services are applied sorted by count in descending order. Countries are applied sorted by count
+   * in descending order with only the top 12 entries used. For each chart this replaces labels,
+   * dataset values, and dataset background colors, then refreshes the chart display.
+   *
+   * @param {Object} data - Summary data containing optional mappings:
+   *   - `services`: object mapping service name → count (e.g. `{ http: 10 }`).
+   *   - `countries`: object mapping country code/name → count (e.g. `{ US: 5 }`).
    */
   function updateCharts(data) {
     if (!data) return;
@@ -371,13 +370,12 @@
   }
 
   /**
-   * Initializes the in-page terminal UI, wiring command handlers, event listeners, and startup message.
+   * Initialize the in-page terminal UI and wire its command handlers and event listeners.
    *
-   * When a .terminal element exists, this sets up the input, run button, and a set of built-in commands
-   * (help, stats, theme, settings, plugins), integrates plugin-provided commands, and logs a ready message.
-   * Binds click and Enter key handlers to execute commands and appends command output to the terminal.
-   *
-   * If no .terminal element is present, the function returns without side effects.
+   * When a .terminal element exists, sets up the output area, input and run button, registers built-in
+   * commands (help, stats, theme, settings, plugins), integrates plugin-provided commands, binds click
+   * and Enter-key handlers to execute commands, and logs a ready message. If no .terminal element is
+   * present, the function performs no actions.
    */
   function initTerminal() {
     const terminal = document.querySelector('.terminal');
@@ -460,11 +458,11 @@
   }
 
   /**
-   * Initialize the data visualizer UI to parse and display JSON or CSV input.
+   * Initialize the data visualizer UI and wire controls for parsing and rendering input.
    *
-   * Wires the text input, file input, and render button so provided text or uploaded files
-   * are parsed as JSON (if the text starts with `{` or `[`) or as CSV otherwise, then
-   * rendered into the output area and logged to the in-page terminal.
+   * Wires the text input, file input, and render button to parse provided text or uploaded files
+   * as JSON or CSV, render the parsed value as pretty-printed JSON into the output area, and
+   * log success or errors to the in-page terminal.
    */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
@@ -549,9 +547,9 @@
   };
 
   /**
-   * Wire the settings panel UI: populate fields from persisted settings, handle form submission to save changes, and toggle panel visibility.
+   * Initialize and wire the settings panel UI.
    *
-   * Populates form controls from AppState.settings, persists updated settings on submit, applies the selected theme, re-initializes Auth0, and logs the save action to the in-page terminal. If the panel or its toggle control are not present, the function is a no-op.
+   * Populates form controls from AppState.settings, saves updated settings on submit (defaulting backendUrl to '/api/censys-summary' when empty), applies the selected theme, re-initializes Auth0, and logs a confirmation to the in-page terminal. If the panel or its toggle control are not present, the function does nothing.
    */
   function initSettingsPanel() {
     const panel = document.querySelector('.settings-panel');
@@ -588,12 +586,12 @@
   }
 
   /**
-   * Initialize and configure the Auth0 client when the Auth0 library and settings are available.
+   * Initializes the Auth0 client when the Auth0 factory and required settings are present.
    *
-   * If the Auth0 factory and configured domain and clientId are present, creates an Auth0 client,
-   * assigns it to AppState.auth0Client, updates authentication UI controls via updateAuthControls,
-   * and logs success or failure messages to the in-page terminal. Does nothing if the factory or
-   * configuration is missing; errors are caught and logged rather than thrown.
+   * If window.createAuth0Client exists and AppState.settings contains auth0Domain and auth0ClientId,
+   * creates the Auth0 client, assigns it to AppState.auth0Client, calls updateAuthControls(), and
+   * logs success or failure messages to the in-page terminal. If the factory or configuration is
+   * missing, the function is a no-op; initialization errors are caught and logged.  
    */
   async function initAuth0() {
     if (!window.createAuth0Client) return;
@@ -616,13 +614,12 @@
   }
 
   /**
-   * Update authentication UI controls to reflect the current Auth0 client and sign-in state.
+   * Synchronizes authentication UI with the current Auth0 client and sign-in state.
    *
-   * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
-   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and attaches click
-   * handlers that perform Auth0 login (popup) and logout (returning to the current page).
-   *
-   * Click handlers are attached at most once per button.
+   * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous",
+   * shows or hides [data-action="login"] and [data-action="logout"] buttons accordingly,
+   * and attaches click handlers (at most once per button) that invoke the Auth0 client's
+   * login (popup) and logout (returning to the current page) flows and then refresh the controls.
    */
   async function updateAuthControls() {
     const loginBtn = document.querySelector('[data-action="login"]');
@@ -662,11 +659,11 @@
   /**
    * Render a world choropleth heatmap into the element with id "worldHeatmap".
    *
-   * Renders country fill colors based on per-country numeric counts and caches loaded world topology for subsequent calls.
-   * Requires D3 and TopoJSON to be available on window; if the world topology has not been loaded it will be fetched and stored on AppState.worldData.
+   * Loads and caches world topology if necessary, then colors countries according to numeric counts provided in data.countries.
+   * If the target element is missing or required libraries (D3, TopoJSON) are not available, the function exits without rendering.
    *
    * @param {Object} data - Data used to color the map.
-   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
+   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (ISO A2 code or country name) to numeric counts.
    */
   async function renderHeatmap(data) {
     const container = document.getElementById('worldHeatmap');
@@ -742,11 +739,10 @@
   }
 
   /**
-   * Populate the versions container with a predefined list of release cards.
+   * Render a predefined set of release cards into the element marked with `[data-version-list]`.
    *
-   * Finds the element selected by the attribute selector `[data-version-list]` and, if present,
-   * replaces its contents with cards for each release showing the version, status, and notes.
-   * If the container is not found, the function does nothing.
+   * Replaces the container's inner HTML with cards showing version, status, and notes.
+   * If no matching element is found, the function is a no-op.
    */
   function initVersionList() {
     const container = document.querySelector('[data-version-list]');
@@ -765,15 +761,15 @@
   }
 
   /**
-   * Initialize UI features for the current page based on the document body's `data-page` attribute.
+   * Initialize UI features for the current page by reading document.body.dataset.page.
    *
-   * Initializes the following feature sets:
-   * - "dashboard": charts, auto-refresh, terminal, and data visualizer
-   * - "docs": docs sidebar and version list
+   * Depending on the page value, enables relevant subsystems:
+   * - "dashboard": charts, auto-refresh, terminal, data visualizer
+   * - "docs": docs sidebar, version list
    * - "versions": version list
-   * - "api": terminal and auto-refresh
-   * - "data": data visualizer and auto-refresh
-   * - default: auto-refresh and terminal
+   * - "api": terminal, auto-refresh
+   * - "data": data visualizer, auto-refresh
+   * - default: auto-refresh, terminal
    */
   function initPageSpecificFeatures() {
     const page = document.body.dataset.page;
