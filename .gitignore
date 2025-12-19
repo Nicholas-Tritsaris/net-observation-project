@@ -20,3 +20,11 @@ wrangler.toml.local
 
 # Generated assets
 *.tmp
+
+# Test artifacts
+node_modules/
+coverage/
+playwright-report/
+test-results/
+.nyc_output/
+*.log

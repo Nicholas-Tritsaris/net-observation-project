@@ -1,0 +1,37 @@
+=== Complete Project Structure with Tests ===
+
+.
+|-- docs
+|   |-- api.html
+|   |-- dashboard.html
+|   |-- data.html
+|   |-- docs.html
+|   |-- index.html
+|   |-- script.js
+|   |-- style.css
+|   `-- versions.html
+|-- functions
+|   `-- api
+|       `-- censys-summary.js
+|-- tests
+|   |-- backend
+|   |   `-- censys-summary.test.js
+|   |-- e2e
+|   |   `-- logo-styling.spec.js
+|   |-- unit
+|   |   `-- script.test.js
+|   |-- README.md
+|   `-- setup.js
+|-- FILES_CREATED.txt
+|-- FINAL_FILE_TREE.txt
+|-- QUICK_TEST_REFERENCE.md
+|-- README.md
+|-- TESTING_SUMMARY.md
+|-- TEST_EXECUTION_GUIDE.md
+|-- TEST_SUITE_OVERVIEW.md
+|-- package.json
+|-- playwright.config.js
+|-- test-summary.txt
+`-- vitest.config.js
+
+8 directories, 25 files

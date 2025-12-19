@@ -1,0 +1,20 @@
+{
+  "name": "net-observation-project",
+  "version": "1.0.0",
+  "description": "Cyber-neon observability suite with comprehensive test coverage",
+  "type": "module",
+  "scripts": {
+    "test": "npm run test:unit && npm run test:backend",
+    "test:unit": "vitest run tests/unit",
+    "test:backend": "vitest run tests/backend",
+    "test:e2e": "playwright test",
+    "test:watch": "vitest watch",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "happy-dom": "^12.10.3",
+    "vitest": "^1.0.0"
+  }
+}
