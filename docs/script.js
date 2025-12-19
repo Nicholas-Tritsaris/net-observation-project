@@ -49,8 +49,8 @@
   /**
    * Apply the configured theme to the document.
    *
-   * When AppState.settings.theme is "auto", the system color scheme preference is used to choose "dark" or "light".
-   * Sets the `data-theme` attribute on the documentElement and `data-theme` on the document body to the resolved theme.
+   * Resolves the "auto" setting to the system color-scheme preference and sets the documentElement `data-theme`
+   * attribute and the document body `data-theme` dataset to the resolved theme (e.g., "dark" or "light").
    */
   function applyTheme() {
     let theme = AppState.settings.theme;
@@ -65,9 +65,8 @@
    * Replace missing or failed logo images with non-interactive text placeholders.
    *
    * For each <img data-logo> element, if the image fails to load or has no intrinsic size,
-   * the image is hidden, a per-image fallback flag is set to avoid repeated replacements,
-   * and a nearby placeholder element is inserted showing the image's alt text (or "NET OBSERVATION")
-   * in uppercase. The placeholder is marked aria-hidden.
+   * hides the image, inserts an aria-hidden placeholder containing the image's alt text
+   * in uppercase (falls back to "NET OBSERVATION"), and marks the image to avoid duplicate replacements.
    */
   function initLogoPlaceholders() {
     const createFallback = (img) => {
@@ -179,22 +178,22 @@
   }
 
   /**
-   * Get the first DOM element matching the given CSS selector.
-   * @param {string} id - CSS selector to query.
-   * @returns {Element|null} The first matched Element, or `null` if none found.
+   * Return the first DOM element that matches the provided CSS selector.
+   * @param {string} id - CSS selector string to query (e.g., '#id', '.class', 'tag').
+   * @returns {Element|null} The first matching Element, or `null` if no match is found.
    */
   function qs(id) {
     return document.querySelector(id);
   }
 
   /**
-   * Update the dashboard's stored stats and refresh all UI views that display those statistics.
+   * Store summary data in AppState and refresh UI elements that display those statistics.
    *
-   * @param {Object} data - Summary data used to update the UI.
+   * @param {Object} data - Summary payload used to update the dashboard.
    * @param {number} [data.total_hosts] - Total number of hosts.
    * @param {number} [data.total_services] - Total number of services.
    * @param {string|number} [data.last_sync] - Timestamp of the last sync (parsable by Date).
-   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers to host counts.
+   * @param {Object<string, number>} [data.countries] - Mapping of country codes/labels to host counts.
    * @param {Object<string, number>} [data.services] - Mapping of service names to counts.
    */
   function updateStatsView(data) {
@@ -213,15 +212,15 @@
   }
 
   /**
-   * Populate a table's tbody with rows from an object's entries sorted by value descending.
+   * Render rows into a table body from an object's entries, sorted by value descending.
    *
-   * Clears the target tbody and appends one <tr> per entry where the first <td> is the object key
-   * and the second <td> is the numeric value formatted with Number(...).toLocaleString().
-   * No changes are made if the selector does not match an element, the element has no tbody,
-   * or if `objectData` is falsy.
+   * Clears the table's existing <tbody> and appends one <tr> per entry where the first cell
+   * is the object key and the second cell is the numeric value formatted with locale separators.
+   * If the selector does not match an element, the element has no <tbody>, or `objectData` is falsy,
+   * the function performs no changes.
    *
    * @param {string} selector - CSS selector for a table element that contains a <tbody>.
-   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; values are sorted descending and formatted with locale separators.
+   * @param {Object<string, number>} objectData - Mapping of label → numeric value to render; values are sorted descending and formatted with Number(...).toLocaleString().
    */
   function renderTable(selector, objectData) {
     const container = qs(selector);
@@ -461,13 +460,9 @@
   }
 
   /**
-   * Initialize the data visualizer UI to parse and display JSON or CSV input.
+   * Initialize the data visualizer UI and wire controls to parse and display JSON or CSV input.
    *
-   * Parses text from the input or an uploaded file as JSON when it begins with `{` or `[`,
-   * otherwise parses it as comma-separated values using the first row as headers, then
-   * renders the resulting object/array into the output area and logs success or errors to the in-page terminal.
-   *
-   * - CSV parsing: the first line is treated as header names; subsequent rows become objects mapping header->value; values and headers are trimmed.
+   * If the input begins with "{" or "[" it is parsed as JSON; otherwise it is parsed as CSV where the first line provides header names and subsequent lines produce objects mapping header → value (both headers and values are trimmed). Parsed data is rendered as pretty-printed JSON into the output area and success or parse errors are logged to the in-page terminal.
    */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
@@ -552,9 +547,9 @@
   };
 
   /**
-   * Initialize the settings panel UI and its toggle, syncing controls with persisted settings.
+   * Initialize and bind the settings panel and its toggle, synchronizing controls with persisted AppState.settings.
    *
-   * Populates the panel's controls from AppState.settings, saves updated settings on submit, applies the selected theme, re-initializes Auth0, and logs a confirmation to the in-page terminal. If the panel or its toggle control are not found, the function performs no action.
+   * Populates panel controls from AppState.settings. When submitted, updates AppState.settings, persists them with saveSettings(), applies the selected theme via applyTheme(), re-initializes Auth0 with initAuth0(), and logs a confirmation to the in-page terminal. If the panel or its toggle is not present, the function does nothing.
    */
   function initSettingsPanel() {
     const panel = document.querySelector('.settings-panel');
@@ -618,13 +613,12 @@
   }
 
   /**
-   * Update authentication UI controls to reflect the current Auth0 client and sign-in state.
+   * Synchronize authentication UI with the current Auth0 client and sign-in state.
    *
    * Updates the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
-   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and attaches click
-   * handlers that perform Auth0 login (popup) and logout (returning to the current page).
-   *
-   * Click handlers are attached at most once per button.
+   * the [data-action="login"] and [data-action="logout"] buttons based on authentication status,
+   * and attaches click handlers (only once per button) that trigger Auth0 login via popup and logout
+   * with return-to-current-page behavior.
    */
   async function updateAuthControls() {
     const loginBtn = document.querySelector('[data-action="login"]');
@@ -662,14 +656,13 @@
   }
 
   /**
-   * Render a world choropleth heatmap into the element with id "worldHeatmap" using per-country counts.
+   * Renders a world choropleth heatmap into the element with id "worldHeatmap" using per-country counts.
    *
-   * Caches loaded world topology on AppState.worldData for subsequent calls. Requires D3 and TopoJSON on window;
-   * the function is a no-op if the target element or required libraries are missing. If the topology is not yet
-   * loaded the function will fetch it and store it before rendering.
+   * If the world topology is not already cached on AppState.worldData the function will fetch and cache it.
+   * The function is a no-op when the target element or required libraries (D3 and TopoJSON on window) are missing.
    *
    * @param {Object} data - Data used to color the map.
-   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
+   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (prefer ISO A2 codes, fallback to country name) to numeric counts.
    */
   async function renderHeatmap(data) {
     const container = document.getElementById('worldHeatmap');
@@ -744,11 +737,9 @@
   }
 
   /**
-   * Populate the versions container with a predefined list of release cards.
+   * Render a predefined list of release cards into the element with [data-version-list].
    *
-   * Finds the element selected by the attribute selector `[data-version-list]` and, if present,
-   * replaces its contents with cards for each release showing the version, status, and notes.
-   * If the container is not found, the function does nothing.
+   * Replaces the container's contents with cards for v2.3, v2.2, v2.1, and v1.x showing version, status, and notes. If the container is not found, the function does nothing.
    */
   function initVersionList() {
     const container = document.querySelector('[data-version-list]');
@@ -808,10 +799,11 @@
   }
 
   /**
-   * Highlights the navigation link that corresponds to the current page.
+   * Mark the navigation link that corresponds to the current page as active.
    *
-   * Compares the last segment of window.location.pathname (or "index.html" for root)
-   * against each nav anchor's href and adds the `active` class to matching links.
+   * Adds the `active` class to anchors inside <nav> whose href matches the current
+   * page's last pathname segment. Treats the site root as "index.html" and matches
+   * anchors with href="/" to the root.
    */
   function markActiveNav() {
     const path = window.location.pathname.split('/').pop() || 'index.html';
