@@ -20,3 +20,8 @@ wrangler.toml.local
 
 # Generated assets
 *.tmp
+
+# Testing
+node_modules/
+coverage/
+*.log
