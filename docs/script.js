@@ -18,6 +18,13 @@
     ? window.matchMedia('(prefers-color-scheme: dark)')
     : { matches: true };
 
+  /**
+   * Load persisted settings from localStorage and merge them into AppState.settings.
+   *
+   * If a stored settings object exists under STORAGE_KEY, its properties are shallow-merged
+   * into the existing AppState.settings. On JSON parse or storage access errors a warning
+   * is logged and AppState.settings is left unchanged.
+   */
   function loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -30,10 +37,21 @@
     }
   }
 
+  /**
+   * Persist the current application settings to browser localStorage.
+   *
+   * Saves AppState.settings as JSON under the STORAGE_KEY, replacing any previously stored value.
+   */
   function saveSettings() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(AppState.settings));
   }
 
+  /**
+   * Resolve the effective theme and apply it to the document.
+   *
+   * If AppState.settings.theme is "auto", selects "dark" or "light" based on the system preference,
+   * then sets the `data-theme` attribute on the documentElement and `data-theme` on the body.
+   */
   function applyTheme() {
     let theme = AppState.settings.theme;
     if (theme === 'auto') {
@@ -43,6 +61,13 @@
     document.body.dataset.theme = theme;
   }
 
+  /**
+   * Replaces missing or failed logo images with a text placeholder element.
+   *
+   * For each <img data-logo> element, if the image fails to load or has no intrinsic size,
+   * the function hides the image, marks it to avoid repeated fallbacks, and inserts a
+   * non-interactive placeholder showing the image's alt text (or "Net Observation") in uppercase.
+   */
   function initLogoPlaceholders() {
     const createFallback = (img) => {
       if (img.dataset.fallback === 'true') return;
@@ -70,6 +95,14 @@
     });
   }
 
+  /**
+   * Initialize the theme toggle control and wire user and system preference handlers.
+   *
+   * Sets up the element [data-role="theme-toggle"] (if present) to cycle the theme through
+   * "auto", "dark", and "light" on click or Enter/Space key, persists the choice to settings,
+   * applies the resolved theme, and updates the visible label at [data-label]. Also listens
+   * for system color-scheme changes and reapplies the theme when the current setting is "auto".
+   */
   function initThemeToggle() {
     const toggle = document.querySelector('[data-role="theme-toggle"]');
     if (!toggle) return;
@@ -112,6 +145,13 @@
     updateLabel();
   }
 
+  /**
+   * Initialize the page sidebar's collapse/expand behavior and its toggle control.
+   *
+   * Adds a click handler to the sidebar toggle that toggles `open`/`collapsed` classes on the sidebar,
+   * updates the toggle's `aria-expanded` attribute and icon, and sets the initial state (collapsed when
+   * window width is less than 880px).
+   */
   function initSidebar() {
     const sidebar = document.querySelector('.sidebar');
     const toggle = document.querySelector('.sidebar-toggle');
@@ -137,10 +177,25 @@
     }
   }
 
+  /**
+   * Selects the first DOM element matching the given CSS selector.
+   * @param {string} id - CSS selector of the element to find.
+   * @returns {Element|null} The first matching Element, or `null` if no match is found.
+   */
   function qs(id) {
     return document.querySelector(id);
   }
 
+  /**
+   * Update the dashboard's stored stats and refresh all UI views that display those statistics.
+   *
+   * @param {Object} data - Summary data used to update the UI.
+   * @param {number} [data.total_hosts] - Total number of hosts.
+   * @param {number} [data.total_services] - Total number of services.
+   * @param {string|number} [data.last_sync] - Timestamp of the last sync (parsable by Date).
+   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers to host counts.
+   * @param {Object<string, number>} [data.services] - Mapping of service names to counts.
+   */
   function updateStatsView(data) {
     AppState.stats = data;
     const totalHosts = qs('[data-stat="total-hosts"]');
@@ -156,6 +211,16 @@
     renderHeatmap(data);
   }
 
+  /**
+   * Populate a table body with rows created from an object's entries, sorted by value descending.
+   *
+   * Clears the table's tbody and appends one row per entry using the object key as the first cell
+   * and the object's value formatted with locale separators as the second cell. If the selector
+   * doesn't match an element, the element has no tbody, or objectData is falsy, the function does nothing.
+   *
+   * @param {string} selector - CSS selector for a table element that contains a <tbody>.
+   * @param {Object<string, number>} objectData - Mapping of label -> numeric value to render; values are sorted descending and formatted with toLocaleString().
+   */
   function renderTable(selector, objectData) {
     const container = qs(selector);
     if (!container) return;
@@ -172,6 +237,14 @@
       });
   }
 
+  /**
+   * Fetches the latest Censys summary from the configured backend URL and updates application state and UI.
+   *
+   * On success, updates window.__latestCensys, calls updateStatsView(data), and logs a success message to the terminal.
+   * On failure, logs a console warning and, unless `silent` is true, logs an error message to the terminal.
+   *
+   * @param {boolean} [silent=false] - When true, suppresses terminal error messages if the fetch fails.
+   */
   async function fetchCensysSummary(silent = false) {
     const endpoint = AppState.settings.backendUrl || '/api/censys-summary';
     try {
@@ -191,11 +264,23 @@
     }
   }
 
+  /**
+   * Initialize automatic periodic fetching of the Censys summary.
+   *
+   * Performs an immediate fetch of the summary and schedules subsequent silent fetches every 60 seconds.
+   */
   function initAutoRefresh() {
     fetchCensysSummary();
     setInterval(() => fetchCensysSummary(true), 60000);
   }
 
+  /**
+   * Initialize the dashboard charts for services and countries and store them on AppState.charts.
+   *
+   * Creates a doughnut chart for services and a bar chart for countries when their canvas elements
+   * are present and Chart.js is available. Charts are initialized with empty labels and datasets
+   * and use the application's color palette and theme-aware text color for labels/ticks.
+   */
   function initCharts() {
     const servicesCtx = document.getElementById('servicesChart');
     const countriesCtx = document.getElementById('countriesChart');
@@ -243,6 +328,14 @@
     }
   }
 
+  /**
+   * Update Chart.js service and country charts from the provided summary data.
+   *
+   * Updates the services chart with all services sorted by count descending,
+   * and updates the countries chart with the top 12 countries by count.
+   * Replaces labels, dataset values, and dataset background colors, then refreshes the charts.
+   * @param {Object} data - Summary data with optional shape `{ services: { [serviceName]: number }, countries: { [countryName]: number } }`.
+   */
   function updateCharts(data) {
     if (!data) return;
     if (AppState.charts.services) {
@@ -264,11 +357,26 @@
     }
   }
 
+  /**
+   * Create a list of visually distinct CSS HSL color strings for charting or UI elements.
+   * @param {number} count - Number of colors to generate.
+   * @param {string} seed - Seed that influences the base hue; when `'services'` the base hue is centered differently.
+   * @returns {string[]} An array of CSS color strings in HSL format with alpha (e.g. `"hsl(... / 0.7)"`).
+   */
   function generateColorPalette(count, seed) {
     const baseHue = seed === 'services' ? 180 : 300;
     return Array.from({ length: count }, (_, idx) => `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`);
   }
 
+  /**
+   * Initializes the in-page terminal UI, wiring command handlers, event listeners, and startup message.
+   *
+   * When a .terminal element exists, this sets up the input, run button, and a set of built-in commands
+   * (help, stats, theme, settings, plugins), integrates plugin-provided commands, and logs a ready message.
+   * Binds click and Enter key handlers to execute commands and appends command output to the terminal.
+   *
+   * If no .terminal element is present, the function returns without side effects.
+   */
   function initTerminal() {
     const terminal = document.querySelector('.terminal');
     if (!terminal) return;
@@ -334,6 +442,11 @@
     logTerminal('Terminal online. Type "help" to explore.');
   }
 
+  /**
+   * Append a timestamped message line to the in-page terminal output and scroll it into view.
+   * If the terminal output element ('.terminal-output') is not present, the function does nothing.
+   * @param {string} message - The message to append to the terminal output.
+   */
   function logTerminal(message) {
     const output = document.querySelector('.terminal-output');
     if (!output) return;
@@ -344,6 +457,13 @@
     output.scrollTop = output.scrollHeight;
   }
 
+  /**
+   * Initialize the data visualizer UI to parse and display JSON or CSV input.
+   *
+   * Wires the text input, file input, and render button so provided text or uploaded files
+   * are parsed as JSON (if the text starts with `{` or `[`) or as CSV otherwise, then
+   * rendered into the output area and logged to the in-page terminal.
+   */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
     const fileInput = document.getElementById('fileInput');
@@ -426,6 +546,15 @@
     }
   };
 
+  /**
+   * Initialize and wire the settings panel UI and its controls.
+   *
+   * Populates form fields from AppState.settings, handles form submission to persist updated settings,
+   * applies the selected theme, re-initializes Auth0, and logs the save action. Also wires the panel
+   * toggle control to show/hide the settings panel.
+   *
+   * If the settings panel or its toggle control are not present in the DOM, the function does nothing.
+   */
   function initSettingsPanel() {
     const panel = document.querySelector('.settings-panel');
     const toggle = document.querySelector('.settings-toggle');
@@ -460,6 +589,13 @@
     });
   }
 
+  /**
+   * Initialize the Auth0 client when the Auth0 library and configuration are available.
+   *
+   * If the global Auth0 factory and the configured domain and clientId are present,
+   * creates an Auth0 client, stores it on `AppState.auth0Client`, updates authentication
+   * UI controls, and logs success or failure messages to the terminal.
+   */
   async function initAuth0() {
     if (!window.createAuth0Client) return;
     if (!AppState.settings.auth0Domain || !AppState.settings.auth0ClientId) return;
@@ -480,6 +616,16 @@
     }
   }
 
+  /**
+   * Update authentication UI controls based on the current Auth0 client and sign-in state.
+   *
+   * Sets the element with [data-auth-status] to "Authenticated" or "Anonymous", shows or hides
+   * the [data-action="login"] and [data-action="logout"] buttons accordingly, and binds click
+   * handlers that perform Auth0 login (popup) and logout (returning to the current page).
+   *
+   * If no Auth0 client is available, both buttons are hidden and the status is set to "Anonymous".
+   * Click handlers are bound only once per button (marked via a data-bound flag).
+   */
   async function updateAuthControls() {
     const loginBtn = document.querySelector('[data-action="login"]');
     const logoutBtn = document.querySelector('[data-action="logout"]');
@@ -515,6 +661,15 @@
     }
   }
 
+  /**
+   * Render a world choropleth heatmap into the element with id "worldHeatmap".
+   *
+   * Renders country fill colors based on per-country numeric counts and caches loaded world topology for subsequent calls.
+   * Requires D3 and TopoJSON to be available on window; if the world topology has not been loaded it will be fetched and stored on AppState.worldData.
+   *
+   * @param {Object} data - Data used to color the map.
+   * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
+   */
   async function renderHeatmap(data) {
     const container = document.getElementById('worldHeatmap');
     if (!container || !window.d3) return;
@@ -568,6 +723,13 @@
       });
   }
 
+  /**
+   * Enable smooth-scrolling for in-page anchor links within the docs sidebar.
+   *
+   * Attaches click handlers to anchors inside `.docs-sidebar` that reference fragment identifiers.
+   * For links whose `href` begins with `#`, the handler prevents the default navigation and
+   * scrolls the target element into view with smooth behavior and start alignment.
+   */
   function initDocsSidebar() {
     const tocLinks = document.querySelectorAll('.docs-sidebar a');
     tocLinks.forEach(link => {
@@ -581,6 +743,13 @@
     });
   }
 
+  /**
+   * Populate the versions container with a predefined list of release cards.
+   *
+   * Finds the element selected by the attribute selector `[data-version-list]` and, if present,
+   * replaces its contents with cards for each release showing the version, status, and notes.
+   * If the container is not found, the function does nothing.
+   */
   function initVersionList() {
     const container = document.querySelector('[data-version-list]');
     if (!container) return;
@@ -597,6 +766,17 @@
       </div>`).join('');
   }
 
+  /**
+   * Initialize UI features for the current page based on the document body's `data-page` attribute.
+   *
+   * Initializes the following feature sets:
+   * - "dashboard": charts, auto-refresh, terminal, and data visualizer
+   * - "docs": docs sidebar and version list
+   * - "versions": version list
+   * - "api": terminal and auto-refresh
+   * - "data": data visualizer and auto-refresh
+   * - default: auto-refresh and terminal
+   */
   function initPageSpecificFeatures() {
     const page = document.body.dataset.page;
     switch (page) {
@@ -627,6 +807,12 @@
     }
   }
 
+  /**
+   * Highlights the navigation link that corresponds to the current page.
+   *
+   * Compares the last segment of window.location.pathname (or "index.html" for root)
+   * against each nav anchor's href and adds the `active` class to matching links.
+   */
   function markActiveNav() {
     const path = window.location.pathname.split('/').pop() || 'index.html';
     document.querySelectorAll('nav a').forEach((link) => {
@@ -637,6 +823,14 @@
     });
   }
 
+  /**
+   * Bootstraps the application's UI, services, and plugins on page load.
+   *
+   * Performs the startup sequence: loads persisted settings, applies the resolved theme,
+   * wires theme toggle and sidebar controls, initializes logo placeholders and the settings panel,
+   * initializes Auth0 and updates authentication controls, marks the active navigation link,
+   * initializes page-specific features, and registers a default "echo-plugin".
+   */
   function init() {
     loadSettings();
     applyTheme();
