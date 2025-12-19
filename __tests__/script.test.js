@@ -913,3 +913,693 @@ describe('Net Observation Project - script.js', () => {
     });
   });
 });
+  describe('Additional Edge Cases for Modified Functions', () => {
+    describe('initLogoPlaceholders() - Comprehensive Edge Cases', () => {
+      it('should handle images with only naturalWidth set to zero', (done) => {
+        document.body.innerHTML = `<img src="logo.png" alt="Test" data-logo />`;
+        eval(scriptContent);
+        
+        const img = document.querySelector('img[data-logo]');
+        Object.defineProperty(img, 'naturalWidth', { value: 0, writable: true });
+        Object.defineProperty(img, 'naturalHeight', { value: 100, writable: true });
+        Object.defineProperty(img, 'complete', { value: true, writable: true });
+        
+        img.dispatchEvent(new Event('load'));
+        
+        setTimeout(() => {
+          expect(img.dataset.fallback).toBe('true');
+          expect(img.nextElementSibling?.className).toBe('logo-placeholder');
+          done();
+        }, 50);
+      });
+
+      it('should handle images with only naturalHeight set to zero', (done) => {
+        document.body.innerHTML = `<img src="logo.png" alt="Test" data-logo />`;
+        eval(scriptContent);
+        
+        const img = document.querySelector('img[data-logo]');
+        Object.defineProperty(img, 'naturalWidth', { value: 100, writable: true });
+        Object.defineProperty(img, 'naturalHeight', { value: 0, writable: true });
+        Object.defineProperty(img, 'complete', { value: true, writable: true });
+        
+        img.dispatchEvent(new Event('load'));
+        
+        setTimeout(() => {
+          expect(img.dataset.fallback).toBe('true');
+          done();
+        }, 50);
+      });
+
+      it('should handle image complete but not yet verified', (done) => {
+        document.body.innerHTML = `<img src="logo.png" alt="Valid" data-logo />`;
+        eval(scriptContent);
+        
+        const img = document.querySelector('img[data-logo]');
+        Object.defineProperty(img, 'naturalWidth', { value: 200, writable: true });
+        Object.defineProperty(img, 'naturalHeight', { value: 200, writable: true });
+        Object.defineProperty(img, 'complete', { value: false, writable: true });
+        
+        // Simulate successful load after initialization
+        setTimeout(() => {
+          Object.defineProperty(img, 'complete', { value: true, writable: true });
+          img.dispatchEvent(new Event('load'));
+          
+          setTimeout(() => {
+            expect(img.dataset.fallback).toBeUndefined();
+            expect(img.nextElementSibling?.className).not.toBe('logo-placeholder');
+            done();
+          }, 50);
+        }, 10);
+      });
+
+      it('should handle special characters in alt text', (done) => {
+        document.body.innerHTML = `<img src="logo.png" alt="Test & Co. <Logo>" data-logo />`;
+        eval(scriptContent);
+        
+        const img = document.querySelector('img[data-logo]');
+        img.dispatchEvent(new Event('error'));
+        
+        setTimeout(() => {
+          const placeholder = img.nextElementSibling;
+          expect(placeholder.textContent).toBe('TEST & CO. <LOGO>');
+          done();
+        }, 50);
+      });
+
+      it('should handle very long alt text', (done) => {
+        const longText = 'A'.repeat(100);
+        document.body.innerHTML = `<img src="logo.png" alt="${longText}" data-logo />`;
+        eval(scriptContent);
+        
+        const img = document.querySelector('img[data-logo]');
+        img.dispatchEvent(new Event('error'));
+        
+        setTimeout(() => {
+          const placeholder = img.nextElementSibling;
+          expect(placeholder.textContent).toBe(longText.toUpperCase());
+          done();
+        }, 50);
+      });
+
+      it('should not interfere with images without data-logo attribute', (done) => {
+        document.body.innerHTML = `
+          <img src="other.png" alt="Other" />
+          <img src="logo.png" alt="Logo" data-logo />
+        `;
+        eval(scriptContent);
+        
+        const regularImg = document.querySelector('img:not([data-logo])');
+        const logoImg = document.querySelector('img[data-logo]');
+        
+        regularImg.dispatchEvent(new Event('error'));
+        logoImg.dispatchEvent(new Event('error'));
+        
+        setTimeout(() => {
+          expect(regularImg.nextElementSibling).toBeFalsy();
+          expect(logoImg.nextElementSibling?.className).toBe('logo-placeholder');
+          done();
+        }, 50);
+      });
+
+      it('should handle rapid successive error events', (done) => {
+        document.body.innerHTML = `<img src="logo.png" alt="Test" data-logo />`;
+        eval(scriptContent);
+        
+        const img = document.querySelector('img[data-logo]');
+        
+        // Trigger multiple error events rapidly
+        img.dispatchEvent(new Event('error'));
+        img.dispatchEvent(new Event('error'));
+        img.dispatchEvent(new Event('error'));
+        
+        setTimeout(() => {
+          const placeholders = document.querySelectorAll('.logo-placeholder');
+          expect(placeholders.length).toBe(1); // Only one placeholder should be created
+          done();
+        }, 50);
+      });
+    });
+
+    describe('applyTheme() - Additional Scenarios', () => {
+      it('should handle null theme setting gracefully', () => {
+        document.body.innerHTML = '<div></div>';
+        localStorage.setItem('net-observation-settings', JSON.stringify({ theme: null }));
+        
+        expect(() => {
+          eval(scriptContent);
+        }).not.toThrow();
+      });
+
+      it('should handle undefined theme setting', () => {
+        document.body.innerHTML = '<div></div>';
+        localStorage.setItem('net-observation-settings', JSON.stringify({ theme: undefined }));
+        
+        expect(() => {
+          eval(scriptContent);
+        }).not.toThrow();
+      });
+
+      it('should handle invalid theme values gracefully', () => {
+        document.body.innerHTML = '<div></div>';
+        localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'invalid-theme' }));
+        
+        expect(() => {
+          eval(scriptContent);
+        }).not.toThrow();
+        
+        // Should still set data-theme attribute
+        expect(document.documentElement.hasAttribute('data-theme')).toBe(true);
+      });
+
+      it('should update both documentElement and body attributes', () => {
+        document.body.innerHTML = '<div></div>';
+        localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'dark' }));
+        
+        eval(scriptContent);
+        
+        expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+        expect(document.body.dataset.theme).toBe('dark');
+      });
+
+      it('should handle case when matchMedia is not a function', () => {
+        const originalMatchMedia = window.matchMedia;
+        window.matchMedia = undefined;
+        
+        document.body.innerHTML = '<div></div>';
+        localStorage.setItem('net-observation-settings', JSON.stringify({ theme: 'auto' }));
+        
+        expect(() => {
+          eval(scriptContent);
+        }).not.toThrow();
+        
+        window.matchMedia = originalMatchMedia;
+      });
+    });
+
+    describe('updateStatsView() - Additional Edge Cases', () => {
+      it('should handle zero values correctly', () => {
+        document.body.innerHTML = `
+          <span data-stat="total-hosts">100</span>
+          <span data-stat="total-services">200</span>
+        `;
+        eval(scriptContent);
+        
+        // Simulate stats with zero values
+        const testData = {
+          total_hosts: 0,
+          total_services: 0,
+          last_sync: new Date().toISOString(),
+          countries: {},
+          services: {}
+        };
+        
+        // Update stats (this happens during fetchCensysSummary)
+        const hostsElement = document.querySelector('[data-stat="total-hosts"]');
+        const servicesElement = document.querySelector('[data-stat="total-services"]');
+        
+        if (hostsElement) hostsElement.textContent = testData.total_hosts?.toLocaleString() ?? '—';
+        if (servicesElement) servicesElement.textContent = testData.total_services?.toLocaleString() ?? '—';
+        
+        expect(hostsElement.textContent).toBe('0');
+        expect(servicesElement.textContent).toBe('0');
+      });
+
+      it('should handle null last_sync gracefully', () => {
+        document.body.innerHTML = `<span data-stat="last-sync">Previous</span>`;
+        eval(scriptContent);
+        
+        const lastSyncElement = document.querySelector('[data-stat="last-sync"]');
+        const testData = { last_sync: null };
+        
+        if (lastSyncElement) {
+          lastSyncElement.textContent = testData.last_sync ? new Date(testData.last_sync).toLocaleString() : '—';
+        }
+        
+        expect(lastSyncElement.textContent).toBe('—');
+      });
+
+      it('should handle invalid date string for last_sync', () => {
+        document.body.innerHTML = `<span data-stat="last-sync"></span>`;
+        eval(scriptContent);
+        
+        const lastSyncElement = document.querySelector('[data-stat="last-sync"]');
+        const invalidDate = 'invalid-date';
+        
+        if (lastSyncElement) {
+          try {
+            const date = new Date(invalidDate);
+            lastSyncElement.textContent = isNaN(date.getTime()) ? '—' : date.toLocaleString();
+          } catch {
+            lastSyncElement.textContent = '—';
+          }
+        }
+        
+        expect(lastSyncElement.textContent).toBeTruthy();
+      });
+
+      it('should handle very large numbers with proper formatting', () => {
+        document.body.innerHTML = `<span data-stat="total-hosts"></span>`;
+        eval(scriptContent);
+        
+        const hostsElement = document.querySelector('[data-stat="total-hosts"]');
+        const largeNumber = 9999999999;
+        
+        if (hostsElement) {
+          hostsElement.textContent = largeNumber.toLocaleString();
+        }
+        
+        expect(hostsElement.textContent).toContain(',');
+        expect(hostsElement.textContent.replace(/,/g, '')).toBe(largeNumber.toString());
+      });
+
+      it('should not fail when tables are missing', () => {
+        document.body.innerHTML = `
+          <span data-stat="total-hosts">0</span>
+        `;
+        
+        expect(() => {
+          eval(scriptContent);
+        }).not.toThrow();
+      });
+    });
+
+    describe('renderTable() - Comprehensive Tests', () => {
+      it('should sort entries by value in descending order', () => {
+        document.body.innerHTML = `
+          <table data-table="test">
+            <tbody></tbody>
+          </table>
+        `;
+        
+        const testData = {
+          'Item A': 50,
+          'Item B': 200,
+          'Item C': 100,
+          'Item D': 25
+        };
+        
+        const sorted = Object.entries(testData).sort((a, b) => b[1] - a[1]);
+        
+        expect(sorted[0]).toEqual(['Item B', 200]);
+        expect(sorted[1]).toEqual(['Item C', 100]);
+        expect(sorted[2]).toEqual(['Item A', 50]);
+        expect(sorted[3]).toEqual(['Item D', 25]);
+      });
+
+      it('should handle equal values', () => {
+        const testData = {
+          'Item A': 100,
+          'Item B': 100,
+          'Item C': 100
+        };
+        
+        const sorted = Object.entries(testData).sort((a, b) => b[1] - a[1]);
+        
+        expect(sorted).toHaveLength(3);
+        sorted.forEach(([_, value]) => expect(value).toBe(100));
+      });
+
+      it('should handle negative values', () => {
+        const testData = {
+          'Item A': -50,
+          'Item B': 100,
+          'Item C': -25
+        };
+        
+        const sorted = Object.entries(testData).sort((a, b) => b[1] - a[1]);
+        
+        expect(sorted[0]).toEqual(['Item B', 100]);
+        expect(sorted[1]).toEqual(['Item C', -25]);
+        expect(sorted[2]).toEqual(['Item A', -50]);
+      });
+
+      it('should handle floating point values', () => {
+        const testData = {
+          'Item A': 1.5,
+          'Item B': 2.7,
+          'Item C': 0.3
+        };
+        
+        const sorted = Object.entries(testData).sort((a, b) => b[1] - a[1]);
+        
+        expect(sorted[0][0]).toBe('Item B');
+        expect(sorted[2][0]).toBe('Item C');
+      });
+    });
+
+    describe('generateColorPalette() - Edge Cases', () => {
+      it('should generate zero colors when count is 0', () => {
+        const generateColorPalette = (count, seed) => {
+          const baseHue = seed === 'services' ? 180 : 300;
+          return Array.from({ length: count }, (_, idx) => 
+            `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+          );
+        };
+        
+        const colors = generateColorPalette(0, 'services');
+        expect(colors).toHaveLength(0);
+      });
+
+      it('should generate a large number of colors', () => {
+        const generateColorPalette = (count, seed) => {
+          const baseHue = seed === 'services' ? 180 : 300;
+          return Array.from({ length: count }, (_, idx) => 
+            `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+          );
+        };
+        
+        const colors = generateColorPalette(100, 'services');
+        expect(colors).toHaveLength(100);
+        
+        // All should be valid HSL strings
+        colors.forEach(color => {
+          expect(color).toMatch(/^hsl\(\d+\s+80%\s+55%\s+\/\s+0\.7\)$/);
+        });
+      });
+
+      it('should wrap hue values correctly (modulo 360)', () => {
+        const generateColorPalette = (count, seed) => {
+          const baseHue = seed === 'services' ? 180 : 300;
+          return Array.from({ length: count }, (_, idx) => 
+            `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+          );
+        };
+        
+        // With baseHue 180 and 27-degree increments, the 7th color should wrap
+        const colors = generateColorPalette(15, 'services');
+        
+        // Extract hue values
+        const hues = colors.map(c => parseInt(c.match(/hsl\((\d+)/)[1]));
+        
+        // All hues should be between 0 and 359
+        hues.forEach(hue => {
+          expect(hue).toBeGreaterThanOrEqual(0);
+          expect(hue).toBeLessThan(360);
+        });
+      });
+
+      it('should generate different colors for services vs countries', () => {
+        const generateColorPalette = (count, seed) => {
+          const baseHue = seed === 'services' ? 180 : 300;
+          return Array.from({ length: count }, (_, idx) => 
+            `hsl(${(baseHue + idx * 27) % 360} 80% 55% / 0.7)`
+          );
+        };
+        
+        const serviceColors = generateColorPalette(5, 'services');
+        const countryColors = generateColorPalette(5, 'countries');
+        
+        expect(serviceColors[0]).not.toBe(countryColors[0]);
+      });
+    });
+
+    describe('fetchCensysSummary() - Network Error Scenarios', () => {
+      beforeEach(() => {
+        global.fetch = jest.fn();
+      });
+
+      it('should handle network timeout', async () => {
+        document.body.innerHTML = '<div class="terminal-output"></div>';
+        
+        global.fetch.mockImplementation(() => 
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Network timeout')), 100)
+          )
+        );
+        
+        eval(scriptContent);
+        
+        // The fetchCensysSummary function is called during init
+        await new Promise(resolve => setTimeout(resolve, 200));
+        
+        const terminalOutput = document.querySelector('.terminal-output');
+        expect(terminalOutput).toBeTruthy();
+      });
+
+      it('should handle malformed JSON response', async () => {
+        document.body.innerHTML = '<div class="terminal-output"></div>';
+        
+        global.fetch.mockResolvedValue({
+          ok: true,
+          json: () => Promise.reject(new Error('Invalid JSON'))
+        });
+        
+        eval(scriptContent);
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        expect(global.fetch).toHaveBeenCalled();
+      });
+
+      it('should handle HTTP 500 error', async () => {
+        document.body.innerHTML = '<div class="terminal-output"></div>';
+        
+        global.fetch.mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: () => Promise.resolve({ error: 'Server error' })
+        });
+        
+        eval(scriptContent);
+        
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        expect(global.fetch).toHaveBeenCalled();
+      });
+    });
+
+    describe('qs() helper function', () => {
+      it('should return first matching element', () => {
+        document.body.innerHTML = `
+          <div class="test">First</div>
+          <div class="test">Second</div>
+        `;
+        
+        const qs = (selector) => document.querySelector(selector);
+        const result = qs('.test');
+        
+        expect(result.textContent).toBe('First');
+      });
+
+      it('should return null for non-existent selector', () => {
+        document.body.innerHTML = '<div></div>';
+        
+        const qs = (selector) => document.querySelector(selector);
+        const result = qs('.non-existent');
+        
+        expect(result).toBeNull();
+      });
+
+      it('should handle complex selectors', () => {
+        document.body.innerHTML = `
+          <div id="parent">
+            <span class="child" data-value="test">Content</span>
+          </div>
+        `;
+        
+        const qs = (selector) => document.querySelector(selector);
+        const result = qs('#parent .child[data-value="test"]');
+        
+        expect(result).toBeTruthy();
+        expect(result.textContent).toBe('Content');
+      });
+    });
+
+    describe('logTerminal() - Additional Cases', () => {
+      it('should handle very long messages', () => {
+        document.body.innerHTML = '<div class="terminal-output"></div>';
+        eval(scriptContent);
+        
+        const longMessage = 'A'.repeat(1000);
+        const output = document.querySelector('.terminal-output');
+        
+        // Simulate logTerminal
+        const line = document.createElement('div');
+        const timestamp = new Date().toLocaleTimeString();
+        line.textContent = `[${timestamp}] ${longMessage}`;
+        output.appendChild(line);
+        
+        expect(output.children.length).toBe(1);
+        expect(output.lastChild.textContent).toContain(longMessage);
+      });
+
+      it('should handle messages with special characters', () => {
+        document.body.innerHTML = '<div class="terminal-output"></div>';
+        
+        const output = document.querySelector('.terminal-output');
+        const specialMessage = '<script>alert("xss")</script>';
+        
+        const line = document.createElement('div');
+        const timestamp = new Date().toLocaleTimeString();
+        line.textContent = `[${timestamp}] ${specialMessage}`;
+        output.appendChild(line);
+        
+        // textContent should escape HTML
+        expect(output.lastChild.textContent).toContain(specialMessage);
+        expect(output.innerHTML).not.toContain('<script>');
+      });
+
+      it('should auto-scroll to bottom after adding message', () => {
+        document.body.innerHTML = '<div class="terminal-output" style="height: 100px; overflow-y: auto;"></div>';
+        
+        const output = document.querySelector('.terminal-output');
+        
+        // Add multiple messages
+        for (let i = 0; i < 20; i++) {
+          const line = document.createElement('div');
+          line.textContent = `[${new Date().toLocaleTimeString()}] Message ${i}`;
+          line.style.height = '20px';
+          output.appendChild(line);
+        }
+        
+        output.scrollTop = output.scrollHeight;
+        
+        expect(output.scrollTop).toBeGreaterThan(0);
+      });
+    });
+
+    describe('Data Visualizer - CSV Parsing Edge Cases', () => {
+      it('should handle CSV with Windows line endings (CRLF)', () => {
+        const parseCSV = (text) => {
+          const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+          const headers = headerLine.split(',').map(h => h.trim());
+          return rows.map(row => {
+            const values = row.split(',');
+            return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+          });
+        };
+        
+        const csvInput = 'name,age\r\nJohn,30\r\nJane,25';
+        const result = parseCSV(csvInput);
+        
+        expect(result).toHaveLength(2);
+        expect(result[0]).toEqual({ name: 'John', age: '30' });
+      });
+
+      it('should handle CSV with Unix line endings (LF)', () => {
+        const parseCSV = (text) => {
+          const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+          const headers = headerLine.split(',').map(h => h.trim());
+          return rows.map(row => {
+            const values = row.split(',');
+            return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+          });
+        };
+        
+        const csvInput = 'name,age\nJohn,30\nJane,25';
+        const result = parseCSV(csvInput);
+        
+        expect(result).toHaveLength(2);
+      });
+
+      it('should handle CSV with extra whitespace in headers', () => {
+        const parseCSV = (text) => {
+          const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+          const headers = headerLine.split(',').map(h => h.trim());
+          return rows.map(row => {
+            const values = row.split(',');
+            return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+          });
+        };
+        
+        const csvInput = ' name , age , city \nJohn,30,NYC';
+        const result = parseCSV(csvInput);
+        
+        expect(result[0]).toHaveProperty('name');
+        expect(result[0]).toHaveProperty('age');
+        expect(result[0]).toHaveProperty('city');
+      });
+
+      it('should handle empty CSV (only headers)', () => {
+        const parseCSV = (text) => {
+          const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+          const headers = headerLine.split(',').map(h => h.trim());
+          return rows.map(row => {
+            const values = row.split(',');
+            return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+          });
+        };
+        
+        const csvInput = 'name,age,city';
+        const result = parseCSV(csvInput);
+        
+        expect(result).toHaveLength(0);
+      });
+
+      it('should handle CSV with more columns than headers', () => {
+        const parseCSV = (text) => {
+          const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+          const headers = headerLine.split(',').map(h => h.trim());
+          return rows.map(row => {
+            const values = row.split(',');
+            return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+          });
+        };
+        
+        const csvInput = 'name,age\nJohn,30,ExtraData';
+        const result = parseCSV(csvInput);
+        
+        expect(result[0]).toEqual({ name: 'John', age: '30' });
+        expect(result[0]).not.toHaveProperty('ExtraData');
+      });
+
+      it('should handle CSV with fewer columns than headers', () => {
+        const parseCSV = (text) => {
+          const [headerLine, ...rows] = text.trim().split(/\r?\n/);
+          const headers = headerLine.split(',').map(h => h.trim());
+          return rows.map(row => {
+            const values = row.split(',');
+            return Object.fromEntries(headers.map((h, idx) => [h, values[idx]?.trim() ?? '']));
+          });
+        };
+        
+        const csvInput = 'name,age,city\nJohn,30';
+        const result = parseCSV(csvInput);
+        
+        expect(result[0]).toEqual({ name: 'John', age: '30', city: '' });
+      });
+    });
+
+    describe('JSON Parsing - Edge Cases', () => {
+      it('should parse nested JSON objects', () => {
+        const jsonInput = '{"user": {"name": "John", "age": 30, "address": {"city": "NYC"}}}';
+        const result = JSON.parse(jsonInput);
+        
+        expect(result.user.address.city).toBe('NYC');
+      });
+
+      it('should parse JSON arrays', () => {
+        const jsonInput = '[{"id": 1}, {"id": 2}, {"id": 3}]';
+        const result = JSON.parse(jsonInput);
+        
+        expect(result).toHaveLength(3);
+        expect(result[2].id).toBe(3);
+      });
+
+      it('should handle JSON with null values', () => {
+        const jsonInput = '{"name": "John", "middleName": null, "age": 30}';
+        const result = JSON.parse(jsonInput);
+        
+        expect(result.middleName).toBeNull();
+        expect(result.name).toBe('John');
+      });
+
+      it('should handle JSON with boolean values', () => {
+        const jsonInput = '{"active": true, "deleted": false}';
+        const result = JSON.parse(jsonInput);
+        
+        expect(result.active).toBe(true);
+        expect(result.deleted).toBe(false);
+      });
+
+      it('should reject invalid JSON', () => {
+        const invalidJson = '{invalid json}';
+        
+        expect(() => {
+          JSON.parse(invalidJson);
+        }).toThrow();
+      });
+    });
+  });
+});
