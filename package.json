@@ -16,7 +16,8 @@
     "testEnvironment": "jsdom",
     "testMatch": ["**/__tests__/**/*.test.js", "**/?(*.)+(spec|test).js"],
     "collectCoverageFrom": [
-      "docs/script.js"
+      "docs/script.js",
+      "functions/api/censys-summary.js"
     ],
     "coveragePathIgnorePatterns": [
       "/node_modules/"
