@@ -47,10 +47,10 @@
   }
 
   /**
-   * Resolve the effective theme and apply it to the document.
+   * Apply the configured theme to the document.
    *
-   * If AppState.settings.theme is "auto", selects "dark" or "light" based on the system preference,
-   * then sets the `data-theme` attribute on the documentElement and `data-theme` on the body.
+   * When AppState.settings.theme is "auto", the system color scheme preference is used to choose "dark" or "light".
+   * Sets the `data-theme` attribute on the documentElement and `data-theme` on the document body to the resolved theme.
    */
   function applyTheme() {
     let theme = AppState.settings.theme;
@@ -179,9 +179,9 @@
   }
 
   /**
-   * Return the first DOM element that matches the provided CSS selector.
-   * @param {string} id - CSS selector string to match against the document.
-   * @returns {Element|null} The first matching Element, or `null` if no element matches.
+   * Get the first DOM element matching the given CSS selector.
+   * @param {string} id - CSS selector to query.
+   * @returns {Element|null} The first matched Element, or `null` if none found.
    */
   function qs(id) {
     return document.querySelector(id);
@@ -267,9 +267,9 @@
   }
 
   /**
-   * Start automatic refresh of the Censys summary.
+   * Start periodic updates of the Censys summary.
    *
-   * Performs an immediate fetch and schedules silent refreshes every 60 seconds.
+   * Triggers an immediate fetch and schedules background (silent) refreshes every 60 seconds.
    */
   function initAutoRefresh() {
     fetchCensysSummary();
@@ -277,11 +277,12 @@
   }
 
   /**
-   * Initialize the dashboard charts for services and countries and store them on AppState.charts.
+   * Initialize Chart.js charts for services and countries and store them on AppState.charts.
    *
-   * Creates a doughnut chart for services and a bar chart for countries when their canvas elements
-   * are present and Chart.js is available. Charts are initialized with empty labels and datasets
-   * and use the application's color palette and theme-aware text color for labels/ticks.
+   * Creates a doughnut chart for services and a bar chart for countries when their canvas
+   * elements exist and Chart.js is available. Charts are initialized with empty labels and
+   * datasets, apply the application's color palette via generateColorPalette, and use the
+   * current theme's text color for labels and ticks.
    */
   function initCharts() {
     const servicesCtx = document.getElementById('servicesChart');
@@ -331,12 +332,13 @@
   }
 
   /**
-   * Update the Chart.js service and country charts to reflect the provided summary data.
+   * Update the services and countries Chart.js charts from a summary data object.
    *
-   * Services are sorted by count (descending) and fully applied to the services chart.
-   * Countries are sorted by count (descending) and the top 12 are applied to the countries chart.
-   * Labels, dataset values, and dataset background colors are replaced and charts are refreshed.
-   * @param {Object} data - Summary data with optional properties `services` and `countries`, each a mapping of name to count (e.g., `{ services: { http: 10 }, countries: { US: 5 } }`).
+   * If corresponding charts exist on AppState.charts, replaces their labels, dataset values,
+   * and dataset background colors and refreshes the charts. Services are populated from all
+   * entries sorted by count descending; countries use the top 12 entries sorted by count descending.
+   * @param {Object} data - Summary data containing optional mappings:
+   *   `{ services?: Record<string, number>, countries?: Record<string, number> }`.
    */
   function updateCharts(data) {
     if (!data) return;
@@ -371,13 +373,12 @@
   }
 
   /**
-   * Initializes the in-page terminal UI, wiring command handlers, event listeners, and startup message.
+   * Initialize the in-page terminal and register built-in and plugin commands.
    *
-   * When a .terminal element exists, this sets up the input, run button, and a set of built-in commands
-   * (help, stats, theme, settings, plugins), integrates plugin-provided commands, and logs a ready message.
-   * Binds click and Enter key handlers to execute commands and appends command output to the terminal.
-   *
-   * If no .terminal element is present, the function returns without side effects.
+   * When a `.terminal` element exists, configures the terminal UI (input and run control),
+   * installs built-in commands (`help`, `stats`, `theme`, `settings`, `plugins`), integrates
+   * commands provided by registered plugins, and logs a startup message. If no `.terminal`
+   * element is present, the function performs no actions.
    */
   function initTerminal() {
     const terminal = document.querySelector('.terminal');
@@ -462,9 +463,11 @@
   /**
    * Initialize the data visualizer UI to parse and display JSON or CSV input.
    *
-   * Wires the text input, file input, and render button so provided text or uploaded files
-   * are parsed as JSON (if the text starts with `{` or `[`) or as CSV otherwise, then
-   * rendered into the output area and logged to the in-page terminal.
+   * Parses text from the input or an uploaded file as JSON when it begins with `{` or `[`,
+   * otherwise parses it as comma-separated values using the first row as headers, then
+   * renders the resulting object/array into the output area and logs success or errors to the in-page terminal.
+   *
+   * - CSV parsing: the first line is treated as header names; subsequent rows become objects mapping header->value; values and headers are trimmed.
    */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
@@ -549,9 +552,9 @@
   };
 
   /**
-   * Wire the settings panel UI: populate fields from persisted settings, handle form submission to save changes, and toggle panel visibility.
+   * Initialize the settings panel UI and its toggle, syncing controls with persisted settings.
    *
-   * Populates form controls from AppState.settings, persists updated settings on submit, applies the selected theme, re-initializes Auth0, and logs the save action to the in-page terminal. If the panel or its toggle control are not present, the function is a no-op.
+   * Populates the panel's controls from AppState.settings, saves updated settings on submit, applies the selected theme, re-initializes Auth0, and logs a confirmation to the in-page terminal. If the panel or its toggle control are not found, the function performs no action.
    */
   function initSettingsPanel() {
     const panel = document.querySelector('.settings-panel');
@@ -588,12 +591,11 @@
   }
 
   /**
-   * Initialize and configure the Auth0 client when the Auth0 library and settings are available.
+   * Initialize the Auth0 client when the Auth0 library and required settings are present.
    *
-   * If the Auth0 factory and configured domain and clientId are present, creates an Auth0 client,
-   * assigns it to AppState.auth0Client, updates authentication UI controls via updateAuthControls,
-   * and logs success or failure messages to the in-page terminal. Does nothing if the factory or
-   * configuration is missing; errors are caught and logged rather than thrown.
+   * Creates and stores an Auth0 client on AppState.auth0Client, updates authentication UI via
+   * updateAuthControls, and logs success or error messages to the in-page terminal. If the
+   * Auth0 factory or required configuration (domain and clientId) is missing, the function is a no-op.
    */
   async function initAuth0() {
     if (!window.createAuth0Client) return;
@@ -660,10 +662,11 @@
   }
 
   /**
-   * Render a world choropleth heatmap into the element with id "worldHeatmap".
+   * Render a world choropleth heatmap into the element with id "worldHeatmap" using per-country counts.
    *
-   * Renders country fill colors based on per-country numeric counts and caches loaded world topology for subsequent calls.
-   * Requires D3 and TopoJSON to be available on window; if the world topology has not been loaded it will be fetched and stored on AppState.worldData.
+   * Caches loaded world topology on AppState.worldData for subsequent calls. Requires D3 and TopoJSON on window;
+   * the function is a no-op if the target element or required libraries are missing. If the topology is not yet
+   * loaded the function will fetch it and store it before rendering.
    *
    * @param {Object} data - Data used to color the map.
    * @param {Object<string, number>} [data.countries] - Mapping of country identifiers (preferred ISO A2 code or country name) to numeric counts.
@@ -722,11 +725,10 @@
   }
 
   /**
-   * Enable smooth scrolling for in-page anchor links in the docs sidebar.
+   * Initialize smooth in-page scrolling for fragment links within the docs sidebar.
    *
-   * Attaches click handlers to anchors inside `.docs-sidebar` that reference fragment
-   * identifiers; when a link's `href` begins with `#` the handler prevents default
-   * navigation and scrolls the target element into view with smooth behavior and start alignment.
+   * Intercepts clicks on anchors inside `.docs-sidebar` whose `href` begins with `#` and scrolls
+   * the referenced element into view with smooth behavior aligned to the start of the viewport.
    */
   function initDocsSidebar() {
     const tocLinks = document.querySelectorAll('.docs-sidebar a');
