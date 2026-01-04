@@ -47,10 +47,10 @@
   }
 
   /**
-   * Apply the configured theme to the document.
+   * Applies the configured theme to the document.
    *
-   * When AppState.settings.theme is "auto", the system color scheme preference is used to choose "dark" or "light".
-   * Sets the `data-theme` attribute on the documentElement and `data-theme` on the document body to the resolved theme.
+   * If AppState.settings.theme is "auto", resolves to "dark" or "light" using the system color-scheme preference.
+   * Sets the documentElement `data-theme` attribute and the document body's `data-theme` dataset to the resolved theme.
    */
   function applyTheme() {
     let theme = AppState.settings.theme;
@@ -64,10 +64,10 @@
   /**
    * Replace missing or failed logo images with non-interactive text placeholders.
    *
-   * For each <img data-logo> element, if the image fails to load or has no intrinsic size,
-   * the image is hidden, a per-image fallback flag is set to avoid repeated replacements,
-   * and a nearby placeholder element is inserted showing the image's alt text (or "NET OBSERVATION")
-   * in uppercase. The placeholder is marked aria-hidden.
+   * For each <img data-logo> element, hides the image and inserts an aria-hidden
+   * placeholder showing the image's alt text (uppercased) or "NET OBSERVATION"
+   * when the image fails to load or has no intrinsic size. Each image is replaced
+   * at most once by setting a per-image fallback flag.
    */
   function initLogoPlaceholders() {
     const createFallback = (img) => {
@@ -147,11 +147,11 @@
   }
 
   /**
-   * Initialize the page sidebar's collapse/expand behavior and its toggle control.
+   * Initialize the sidebar's open/collapsed UI behavior and wire its toggle control.
    *
-   * Adds a click handler to the sidebar toggle that toggles `open`/`collapsed` classes on the sidebar,
-   * updates the toggle's `aria-expanded` attribute and icon, and sets the initial state (collapsed when
-   * window width is less than 880px).
+   * Sets up a click handler on the sidebar toggle that toggles the sidebar between open and collapsed
+   * states, updates the toggle's `aria-expanded` attribute and its icon, and establishes the initial
+   * state (collapsed when window width is less than 880px).
    */
   function initSidebar() {
     const sidebar = document.querySelector('.sidebar');
@@ -332,13 +332,15 @@
   }
 
   /**
-   * Update the services and countries Chart.js charts from a summary data object.
+   * Update the dashboard's services and countries Chart.js charts from a summary object.
    *
-   * If corresponding charts exist on AppState.charts, replaces their labels, dataset values,
-   * and dataset background colors and refreshes the charts. Services are populated from all
-   * entries sorted by count descending; countries use the top 12 entries sorted by count descending.
-   * @param {Object} data - Summary data containing optional mappings:
-   *   `{ services?: Record<string, number>, countries?: Record<string, number> }`.
+   * When present, the services chart is populated from all service entries (ordered by count descending)
+   * and the countries chart is populated from the top 12 country entries (ordered by count descending).
+   * Each chart's labels, dataset values, and dataset background colors are replaced and the chart is refreshed.
+   *
+   * @param {Object} data - Summary data.
+   * @param {Record<string, number>} [data.services] - Mapping of service name to count.
+   * @param {Record<string, number>} [data.countries] - Mapping of country name to count.
    */
   function updateCharts(data) {
     if (!data) return;
@@ -461,13 +463,9 @@
   }
 
   /**
-   * Initialize the data visualizer UI to parse and display JSON or CSV input.
+   * Initialize the data visualizer UI and wire controls to parse and display JSON or CSV input.
    *
-   * Parses text from the input or an uploaded file as JSON when it begins with `{` or `[`,
-   * otherwise parses it as comma-separated values using the first row as headers, then
-   * renders the resulting object/array into the output area and logs success or errors to the in-page terminal.
-   *
-   * - CSV parsing: the first line is treated as header names; subsequent rows become objects mapping header->value; values and headers are trimmed.
+   * Parses input text or an uploaded file as JSON when it begins with "{" or "["; otherwise parses as CSV using the first row as headers and mapping subsequent rows to objects with trimmed headers and values. Renders the parsed result into the output container and logs success or errors to the in-page terminal.
    */
   function initDataVisualizer() {
     const jsonInput = document.getElementById('dataInput');
@@ -591,11 +589,11 @@
   }
 
   /**
-   * Initialize the Auth0 client when the Auth0 library and required settings are present.
+   * Initialize and configure the Auth0 client when the Auth0 library and required settings are available.
    *
-   * Creates and stores an Auth0 client on AppState.auth0Client, updates authentication UI via
-   * updateAuthControls, and logs success or error messages to the in-page terminal. If the
-   * Auth0 factory or required configuration (domain and clientId) is missing, the function is a no-op.
+   * Creates and stores an Auth0 client on AppState.auth0Client, calls updateAuthControls to refresh authentication UI, and logs success or failure to the in-page terminal.
+   *
+   * The function performs no action if the Auth0 factory or required configuration (auth0Domain or auth0ClientId) is missing; initialization errors are logged but not thrown.
    */
   async function initAuth0() {
     if (!window.createAuth0Client) return;
@@ -767,15 +765,15 @@
   }
 
   /**
-   * Initialize UI features for the current page based on the document body's `data-page` attribute.
+   * Initialize UI features appropriate for the current page by reading document.body.dataset.page.
    *
-   * Initializes the following feature sets:
-   * - "dashboard": charts, auto-refresh, terminal, and data visualizer
-   * - "docs": docs sidebar and version list
+   * The function enables feature sets for known page values:
+   * - "dashboard": charts, auto-refresh, terminal, data visualizer
+   * - "docs": docs sidebar, version list
    * - "versions": version list
-   * - "api": terminal and auto-refresh
-   * - "data": data visualizer and auto-refresh
-   * - default: auto-refresh and terminal
+   * - "api": terminal, auto-refresh
+   * - "data": data visualizer, auto-refresh
+   * For any other value (including undefined), it enables auto-refresh and the terminal.
    */
   function initPageSpecificFeatures() {
     const page = document.body.dataset.page;
